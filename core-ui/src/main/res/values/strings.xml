@@ -219,6 +219,7 @@
     <string name="chat_sources">回答来源</string>
     <string name="chat_suggested_questions">建议追问</string>
     <string name="chat_no_match">本地数据里暂时没有足够匹配的信息。可以换一个更具体的地点、菜名、建筑或问题表达方式。</string>
+    <string name="chat_timeout">回答生成超时，已返回当前可用结果。请尝试缩短问题或稍后重试。</string>
     <string name="chat_history_translate">翻译历史</string>
     <string name="chat_history_photo">拍照翻译历史</string>
     <string name="chat_history_voice">语音翻译历史</string>

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Settings
@@ -72,6 +73,7 @@ fun ChatRoute(
         onOpenSettings = onOpenSettings,
         onInputChange = viewModel::setInput,
         onSend = viewModel::sendCurrentInput,
+        onStopGenerating = viewModel::stopGenerating,
         onUseSuggestedQuestion = viewModel::sendSuggestedQuestion,
         onOpenWikiArticle = onOpenWikiArticle,
         onOpenGemDetail = onOpenGemDetail
@@ -86,6 +88,7 @@ fun ChatScreen(
     onOpenSettings: () -> Unit = {},
     onInputChange: (String) -> Unit = {},
     onSend: () -> Unit = {},
+    onStopGenerating: () -> Unit = {},
     onUseSuggestedQuestion: (String) -> Unit = {},
     onOpenWikiArticle: (String) -> Unit = {},
     onOpenGemDetail: (String) -> Unit = {},
@@ -179,14 +182,28 @@ fun ChatScreen(
                 shape = RoundedCornerShape(20.dp)
             )
             IconButton(
-                onClick = onSend,
+                onClick = {
+                    if (uiState.isThinking) {
+                        onStopGenerating()
+                    } else {
+                        onSend()
+                    }
+                },
                 modifier = Modifier
                     .size(52.dp)
                     .background(MaterialTheme.colorScheme.primary, CircleShape)
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.Send,
-                    contentDescription = stringResource(R.string.chat_send),
+                    imageVector = if (uiState.isThinking) {
+                        Icons.Outlined.Close
+                    } else {
+                        Icons.AutoMirrored.Outlined.Send
+                    },
+                    contentDescription = if (uiState.isThinking) {
+                        stringResource(R.string.action_close)
+                    } else {
+                        stringResource(R.string.chat_send)
+                    },
                     tint = MaterialTheme.colorScheme.onPrimary
                 )
             }

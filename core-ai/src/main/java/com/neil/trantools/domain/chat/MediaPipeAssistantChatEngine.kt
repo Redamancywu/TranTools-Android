@@ -5,7 +5,22 @@ import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import com.neil.trantools.data.chat.ChatSource
 import com.neil.trantools.data.chat.LocalAssistantAnswer
 import com.neil.trantools.data.settings.ResourcePackageRepository
+import java.util.concurrent.CancellationException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicReference
+
+enum class AssistantModelRuntimeState {
+    Unknown,
+    NoModel,
+    Ready,
+    Failed,
+}
+
+data class AssistantModelRuntimeStatus(
+    val state: AssistantModelRuntimeState,
+    val message: String? = null,
+)
 
 class MediaPipeAssistantChatEngine(
     private val context: Context,
@@ -16,18 +31,31 @@ class MediaPipeAssistantChatEngine(
 
     @Volatile
     private var currentModelPath: String? = null
+    @Volatile
+    private var runtimeStatus = AssistantModelRuntimeStatus(state = AssistantModelRuntimeState.Unknown)
 
     override suspend fun generateAnswer(
         result: AssistantRetrievalResult,
         onPartialAnswer: (String) -> Unit,
     ): LocalAssistantAnswer {
         val modelPath = ResourcePackageRepository.getReadyModelPath(context)
-            ?: return LocalAssistantChatEngine(fallbackAnswer).generateAnswer(result, onPartialAnswer)
+            ?: return fallbackWithStatus(
+                result = result,
+                onPartialAnswer = onPartialAnswer,
+                state = AssistantModelRuntimeState.NoModel,
+                message = "Model pack not installed."
+            )
 
         val inference = runCatching {
             ensureInference(modelPath)
         }.getOrElse {
-            return LocalAssistantChatEngine(fallbackAnswer).generateAnswer(result, onPartialAnswer)
+            if (it is CancellationException) throw it
+            return fallbackWithStatus(
+                result = result,
+                onPartialAnswer = onPartialAnswer,
+                state = AssistantModelRuntimeState.Failed,
+                message = it.message ?: "Model initialization failed."
+            )
         }
 
         val prompt = buildPrompt(result)
@@ -43,15 +71,36 @@ class MediaPipeAssistantChatEngine(
                     onPartialAnswer(merged.trim())
                 }
             }
-            future.get().trim()
+            try {
+                future.get(MODEL_RESPONSE_TIMEOUT_SECONDS, TimeUnit.SECONDS).trim()
+            } catch (timeout: TimeoutException) {
+                future.cancel(true)
+                throw timeout
+            }
         }.getOrElse {
-            return LocalAssistantChatEngine(fallbackAnswer).generateAnswer(result, onPartialAnswer)
+            if (it is CancellationException) throw it
+            return fallbackWithStatus(
+                result = result,
+                onPartialAnswer = onPartialAnswer,
+                state = AssistantModelRuntimeState.Failed,
+                message = if (it is TimeoutException) {
+                    "Model inference timed out."
+                } else {
+                    it.message ?: "Model inference failed."
+                }
+            )
         }
 
         if (generatedText.isBlank()) {
-            return LocalAssistantChatEngine(fallbackAnswer).generateAnswer(result, onPartialAnswer)
+            return fallbackWithStatus(
+                result = result,
+                onPartialAnswer = onPartialAnswer,
+                state = AssistantModelRuntimeState.Failed,
+                message = "Model returned empty response."
+            )
         }
 
+        setRuntimeStatus(AssistantModelRuntimeState.Ready)
         onPartialAnswer(generatedText)
 
         return LocalAssistantAnswer(
@@ -69,6 +118,28 @@ class MediaPipeAssistantChatEngine(
         )
     }
 
+    suspend fun warmUp(): AssistantModelRuntimeStatus {
+        val modelPath = ResourcePackageRepository.getReadyModelPath(context)
+        if (modelPath == null) {
+            return setRuntimeStatus(
+                state = AssistantModelRuntimeState.NoModel,
+                message = "Model pack not installed."
+            )
+        }
+
+        return runCatching {
+            ensureInference(modelPath)
+            setRuntimeStatus(AssistantModelRuntimeState.Ready)
+        }.getOrElse { throwable ->
+            setRuntimeStatus(
+                state = AssistantModelRuntimeState.Failed,
+                message = throwable.message ?: "Model warm-up failed."
+            )
+        }
+    }
+
+    fun getRuntimeStatus(): AssistantModelRuntimeStatus = runtimeStatus
+
     private suspend fun ensureInference(modelPath: String): LlmInference {
         val existing = llmInference
         if (existing != null && currentModelPath == modelPath) {
@@ -84,6 +155,28 @@ class MediaPipeAssistantChatEngine(
         return LlmInference.createFromOptions(context, options).also { inference ->
             llmInference = inference
             currentModelPath = modelPath
+        }
+    }
+
+    private suspend fun fallbackWithStatus(
+        result: AssistantRetrievalResult,
+        onPartialAnswer: (String) -> Unit,
+        state: AssistantModelRuntimeState,
+        message: String,
+    ): LocalAssistantAnswer {
+        setRuntimeStatus(state = state, message = message)
+        return LocalAssistantChatEngine(fallbackAnswer).generateAnswer(result, onPartialAnswer)
+    }
+
+    private fun setRuntimeStatus(
+        state: AssistantModelRuntimeState,
+        message: String? = null,
+    ): AssistantModelRuntimeStatus {
+        return AssistantModelRuntimeStatus(
+            state = state,
+            message = message
+        ).also { status ->
+            runtimeStatus = status
         }
     }
 
@@ -130,5 +223,9 @@ class MediaPipeAssistantChatEngine(
         if (previous.startsWith(incoming)) return previous
         if (previous.contains(incoming)) return previous
         return previous + incoming
+    }
+
+    companion object {
+        private const val MODEL_RESPONSE_TIMEOUT_SECONDS = 40L
     }
 }

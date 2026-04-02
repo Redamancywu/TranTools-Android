@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.subscriptionDataStore by preferencesDataStore(name = "subscription_store")
@@ -27,5 +28,9 @@ object SubscriptionStore {
         context.subscriptionDataStore.edit { prefs ->
             prefs[subscriptionStateKey] = state.name
         }
+    }
+
+    suspend fun get(context: Context): LocalSubscriptionState {
+        return observe(context).first()
     }
 }

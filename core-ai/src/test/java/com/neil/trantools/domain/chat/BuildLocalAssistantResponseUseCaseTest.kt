@@ -74,6 +74,58 @@ class BuildLocalAssistantResponseUseCaseTest {
         assertTrue(response.sources.any { it.title.contains("Kiyomizu-dera") })
         assertTrue(response.sources.any { it.subtitle == "Translate history" })
     }
+
+    @Test
+    fun `fallback when no citation meets confidence threshold`() {
+        val fallback = "No match"
+        val useCase = BuildLocalAssistantResponseUseCase(
+            wikiProvider = { _, _ ->
+                listOf(
+                    WikiArticle(
+                        id = "kiyomizu",
+                        title = "Kiyomizu-dera",
+                        place = "Kyoto",
+                        category = WikiCategory.Culture,
+                        summary = "A hillside temple with a famous wooden stage.",
+                        fact = "Go early for fewer crowds.",
+                        content = listOf("The temple is known for city views and historic architecture."),
+                        tags = listOf("Temple")
+                    )
+                )
+            },
+            gemsProvider = { _, _ ->
+                listOf(
+                    GemPoi(
+                        id = "gion-food",
+                        title = "Gion Street Food",
+                        category = GemCategory.Food,
+                        summary = "A compact area with local snacks.",
+                        tip = "Visit after sunset.",
+                        address = "Kyoto",
+                        latitude = 0.0,
+                        longitude = 0.0,
+                        rating = 4.4,
+                        tags = listOf("Food")
+                    )
+                )
+            },
+            historyProvider = { emptyList() },
+            fallbackAnswer = fallback,
+            translateHistoryLabel = "Translate history",
+            photoHistoryLabel = "Photo history",
+            voiceHistoryLabel = "Voice history"
+        )
+
+        val response = runSuspend {
+            useCase(
+                question = "How to renew a passport in another country?",
+                previousUserTurns = emptyList()
+            )
+        }
+
+        assertTrue(response.answer == fallback)
+        assertTrue(response.sources.isEmpty())
+    }
 }
 
 private fun <T> runSuspend(block: suspend () -> T): T {

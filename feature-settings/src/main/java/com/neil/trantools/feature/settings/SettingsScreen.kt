@@ -212,6 +212,7 @@ fun SettingsScreen(
                         modelPacks.forEach { pack ->
                             ModelPackRow(
                                 pack = pack,
+                                isPro = subscriptionState == SubscriptionState.Pro,
                                 onInstall = { onInstallModelPack(pack.id) },
                                 onRemove = { onRemoveModelPack(pack.id) }
                             )
@@ -335,9 +336,12 @@ fun SettingsScreen(
 @Composable
 private fun ModelPackRow(
     pack: ModelPackInfo,
+    isPro: Boolean,
     onInstall: () -> Unit,
     onRemove: () -> Unit,
 ) {
+    val premiumLocked = pack.premium && !isPro && !pack.installed
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -407,6 +411,13 @@ private fun ModelPackRow(
         } else if (pack.installed) {
             OutlinedButton(onClick = onRemove) {
                 Text(stringResource(R.string.action_remove))
+            }
+        } else if (premiumLocked) {
+            OutlinedButton(
+                onClick = {},
+                enabled = false
+            ) {
+                Text(stringResource(R.string.settings_pack_pro_only))
             }
         } else {
             Button(onClick = onInstall) {

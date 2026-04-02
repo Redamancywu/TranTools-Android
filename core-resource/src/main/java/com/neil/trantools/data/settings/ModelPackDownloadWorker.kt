@@ -1,14 +1,23 @@
 package com.neil.trantools.data.settings
 
 import android.content.Context
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.io.File
+import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.net.URL
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 
 class ModelPackDownloadWorker(
     appContext: Context,
@@ -49,13 +58,20 @@ class ModelPackDownloadWorker(
             )
             Result.success()
         }.getOrElse { throwable ->
+            if (throwable is CancellationException) throw throwable
             tempFile.delete()
-            ModelPackStore.setFailed(
-                context = applicationContext,
-                packId = packId,
-                errorMessage = throwable.message ?: "Model download failed"
-            )
-            Result.retry()
+            val failure = classifyFailure(throwable)
+            if (failure.retryable && runAttemptCount < MAX_RETRY_ATTEMPTS) {
+                ModelPackStore.setDownloading(applicationContext, packId, 1)
+                Result.retry()
+            } else {
+                ModelPackStore.setFailed(
+                    context = applicationContext,
+                    packId = packId,
+                    errorMessage = failure.message
+                )
+                Result.failure()
+            }
         }
     }
 
@@ -71,37 +87,60 @@ class ModelPackDownloadWorker(
             instanceFollowRedirects = true
             setRequestProperty("User-Agent", "TranTools-Android/1.0")
         }
-        connection.connect()
+        try {
+            connection.connect()
 
-        val responseCode = connection.responseCode
-        if (responseCode !in 200..299) {
-            val details = when (responseCode) {
-                401, 403 -> "Model download requires accepted model license access."
-                else -> "HTTP $responseCode"
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) {
+                throw DownloadFailure(
+                    message = when (responseCode) {
+                        401, 403 -> "Model download requires accepted model license access."
+                        404 -> "Model package not found on server."
+                        else -> "HTTP $responseCode"
+                    },
+                    retryable = isRetryableHttpCode(responseCode)
+                )
             }
-            connection.disconnect()
-            error(details)
-        }
 
-        val totalBytes = connection.contentLengthLong.coerceAtLeast(0L)
-        destination.outputStream().use { output ->
-            connection.inputStream.use { input ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                var downloaded = 0L
-                var read = input.read(buffer)
-                while (read >= 0) {
-                    output.write(buffer, 0, read)
-                    downloaded += read
-                    if (totalBytes > 0L) {
-                        val progress = ((downloaded * 100L) / totalBytes).toInt().coerceIn(1, 99)
-                        onProgress(progress)
+            val totalBytes = connection.contentLengthLong.coerceAtLeast(0L)
+            destination.outputStream().use { output ->
+                connection.inputStream.use { input ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var downloaded = 0L
+                    var read = input.read(buffer)
+                    while (read >= 0) {
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        if (totalBytes > 0L) {
+                            val progress = ((downloaded * 100L) / totalBytes).toInt().coerceIn(1, 99)
+                            onProgress(progress)
+                        }
+                        read = input.read(buffer)
                     }
-                    read = input.read(buffer)
                 }
             }
+            onProgress(100)
+        } catch (timeout: SocketTimeoutException) {
+            throw DownloadFailure(
+                message = "Download timed out. Please retry.",
+                retryable = true,
+                cause = timeout
+            )
+        } catch (unknownHost: UnknownHostException) {
+            throw DownloadFailure(
+                message = "Network unavailable. Check connection and retry.",
+                retryable = true,
+                cause = unknownHost
+            )
+        } catch (io: IOException) {
+            throw DownloadFailure(
+                message = io.message ?: "Download failed due to network error.",
+                retryable = true,
+                cause = io
+            )
+        } finally {
+            connection.disconnect()
         }
-        connection.disconnect()
-        onProgress(100)
     }
 
     companion object {
@@ -109,6 +148,8 @@ class ModelPackDownloadWorker(
         private const val KEY_FILE_NAME = "file_name"
         private const val KEY_DOWNLOAD_URL = "download_url"
         private const val KEY_PROGRESS = "progress"
+        private const val MAX_RETRY_ATTEMPTS = 2
+        private const val RETRY_BACKOFF_SECONDS = 30L
 
         fun enqueue(
             context: Context,
@@ -116,7 +157,16 @@ class ModelPackDownloadWorker(
             fileName: String,
             downloadUrl: String,
         ) {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
             val request = OneTimeWorkRequestBuilder<ModelPackDownloadWorker>()
+                .setConstraints(constraints)
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    RETRY_BACKOFF_SECONDS,
+                    TimeUnit.SECONDS
+                )
                 .setInputData(
                     Data.Builder()
                         .putString(KEY_PACK_ID, packId)
@@ -127,9 +177,48 @@ class ModelPackDownloadWorker(
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 "model-pack-$packId",
-                androidx.work.ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.REPLACE,
                 request
             )
         }
+
+        private fun isRetryableHttpCode(code: Int): Boolean {
+            return code == 408 || code == 429 || code in 500..599
+        }
+
+        private fun classifyFailure(throwable: Throwable): DownloadFailure {
+            return when (throwable) {
+                is DownloadFailure -> throwable
+                is SocketTimeoutException -> DownloadFailure(
+                    message = "Download timed out. Please retry.",
+                    retryable = true,
+                    cause = throwable
+                )
+
+                is UnknownHostException -> DownloadFailure(
+                    message = "Network unavailable. Check connection and retry.",
+                    retryable = true,
+                    cause = throwable
+                )
+
+                is IOException -> DownloadFailure(
+                    message = throwable.message ?: "Download failed due to network error.",
+                    retryable = true,
+                    cause = throwable
+                )
+
+                else -> DownloadFailure(
+                    message = throwable.message ?: "Model download failed.",
+                    retryable = false,
+                    cause = throwable
+                )
+            }
+        }
     }
 }
+
+private data class DownloadFailure(
+    override val message: String,
+    val retryable: Boolean,
+    override val cause: Throwable? = null,
+) : RuntimeException(message, cause)

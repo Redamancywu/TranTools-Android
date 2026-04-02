@@ -9,12 +9,15 @@ import com.neil.trantools.data.wiki.WikiArticle
 import com.neil.trantools.data.wiki.WikiCategory
 import com.neil.trantools.data.wiki.WikiPreferencesStore
 import com.neil.trantools.data.wiki.WikiRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -25,10 +28,16 @@ class WikiViewModel @Inject constructor(
     private val appContext: Context,
 ) : ViewModel() {
     private val allArticles = MutableStateFlow<List<WikiArticle>>(WikiRepository.loadArticles(appContext))
+    private val visibleArticles = MutableStateFlow(allArticles.value)
     private val query = MutableStateFlow("")
     private val question = MutableStateFlow("")
     private val answer = MutableStateFlow<com.neil.trantools.data.wiki.WikiAnswer?>(null)
     private val selectedCategory = MutableStateFlow<WikiCategory?>(null)
+    private var refreshSearchJob: Job? = null
+
+    init {
+        refreshVisibleArticles()
+    }
 
     private val preferenceState = combine(
         WikiPreferencesStore.observeFavoriteIds(appContext),
@@ -53,11 +62,13 @@ class WikiViewModel @Inject constructor(
 
     val uiState: StateFlow<WikiUiState> = combine(
         allArticles,
+        visibleArticles,
         screenState,
         preferenceState
-    ) { articles, screen, preferences ->
+    ) { articles, visible, screen, preferences ->
         WikiUiState(
             allArticles = articles,
+            articles = visible,
             query = screen.query,
             question = screen.question,
             answer = screen.answer,
@@ -73,6 +84,7 @@ class WikiViewModel @Inject constructor(
 
     fun setQuery(value: String) {
         query.value = value
+        refreshVisibleArticles()
     }
 
     fun setQuestion(value: String) {
@@ -84,6 +96,7 @@ class WikiViewModel @Inject constructor(
 
     fun setCategory(category: WikiCategory?) {
         selectedCategory.value = category
+        refreshVisibleArticles()
     }
 
     fun askQuestion() {
@@ -125,6 +138,46 @@ class WikiViewModel @Inject constructor(
     fun findArticle(articleId: String): WikiArticle? {
         return WikiRepository.findById(allArticles.value, articleId)
     }
+
+    private fun refreshVisibleArticles() {
+        refreshSearchJob?.cancel()
+        val currentQuery = query.value.trim()
+        val currentCategory = selectedCategory.value
+        refreshSearchJob = viewModelScope.launch {
+            val indexedResults = withContext(Dispatchers.IO) {
+                if (currentQuery.isBlank()) {
+                    allArticles.value
+                } else {
+                    WikiRepository.searchIndexedArticles(
+                        context = appContext,
+                        query = currentQuery,
+                        limit = INDEXED_SEARCH_LIMIT
+                    )
+                }
+            }
+
+            val fallbackResults = if (currentQuery.isBlank()) {
+                allArticles.value
+            } else {
+                WikiRepository.search(
+                    articles = allArticles.value,
+                    query = currentQuery,
+                    category = null
+                )
+            }
+            val baseResults = if (currentQuery.isBlank()) {
+                allArticles.value
+            } else if (indexedResults.isNotEmpty()) {
+                indexedResults
+            } else {
+                fallbackResults
+            }
+
+            visibleArticles.value = baseResults.filter { article ->
+                currentCategory == null || article.category == currentCategory
+            }
+        }
+    }
 }
 
 private data class ScreenState(
@@ -133,3 +186,5 @@ private data class ScreenState(
     val answer: com.neil.trantools.data.wiki.WikiAnswer?,
     val category: WikiCategory?,
 )
+
+private const val INDEXED_SEARCH_LIMIT = 48

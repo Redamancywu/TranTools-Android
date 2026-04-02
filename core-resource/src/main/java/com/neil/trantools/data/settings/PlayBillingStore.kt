@@ -31,12 +31,15 @@ object PlayBillingStore {
     private val _subscriptionState = MutableStateFlow<LocalSubscriptionState?>(null)
     private var billingClient: BillingClient? = null
     private var productDetailsCache: ProductDetails? = null
+    private var applicationContext: Context? = null
 
     fun observeState(): StateFlow<LocalSubscriptionState?> = _subscriptionState.asStateFlow()
+    fun currentState(): LocalSubscriptionState? = _subscriptionState.value
 
     fun init(context: Context) {
         if (!initialized.compareAndSet(false, true)) return
         val appContext = context.applicationContext
+        applicationContext = appContext
         val listener = PurchasesUpdatedListener { result, purchases ->
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                 handlePurchases(purchases.orEmpty())
@@ -123,8 +126,17 @@ object PlayBillingStore {
                 }
             }
             _subscriptionState.value = LocalSubscriptionState.Pro
+            syncSubscriptionStore(LocalSubscriptionState.Pro)
         } else {
             _subscriptionState.value = LocalSubscriptionState.Free
+            syncSubscriptionStore(LocalSubscriptionState.Free)
+        }
+    }
+
+    private fun syncSubscriptionStore(state: LocalSubscriptionState) {
+        val context = applicationContext ?: return
+        scope.launch {
+            SubscriptionStore.set(context, state)
         }
     }
 

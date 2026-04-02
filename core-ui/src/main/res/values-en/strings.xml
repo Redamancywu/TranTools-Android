@@ -218,6 +218,7 @@
     <string name="chat_sources">Sources</string>
     <string name="chat_suggested_questions">Suggested Follow-ups</string>
     <string name="chat_no_match">There is not enough matching local data yet. Try a more specific place, food, building, or wording.</string>
+    <string name="chat_timeout">Answer generation timed out. Returning the best available result so far.</string>
     <string name="chat_history_translate">Translate history</string>
     <string name="chat_history_photo">Photo translate history</string>
     <string name="chat_history_voice">Voice translate history</string>

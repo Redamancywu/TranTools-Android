@@ -110,6 +110,14 @@ object ResourcePackageRepository {
 
     suspend fun installModelPack(context: Context, packId: String) {
         if (packId == "translate-core") return
+        if (isPremiumPack(packId) && !hasPremiumAccess(context)) {
+            ModelPackStore.setFailed(
+                context = context,
+                packId = packId,
+                errorMessage = premiumRequiredError
+            )
+            return
+        }
         if (packId == assistantQwenPack.id) {
             enqueuePrimaryAssistantPackDownload(context)
             return
@@ -220,6 +228,18 @@ object ResourcePackageRepository {
         return File(context.filesDir, "model-packs")
     }
 
+    private suspend fun hasPremiumAccess(context: Context): Boolean {
+        val billingState = PlayBillingStore.currentState()
+        if (billingState != null) {
+            return billingState == LocalSubscriptionState.Pro
+        }
+        return SubscriptionStore.get(context) == LocalSubscriptionState.Pro
+    }
+
+    private fun isPremiumPack(packId: String): Boolean {
+        return packId in premiumModelPackIds
+    }
+
     private val assistantQwenPack = DownloadableModelPackDefinition(
         id = "qwen2.5-1.5b-instruct-q8",
         title = "Qwen2.5 1.5B Instruct",
@@ -230,4 +250,11 @@ object ResourcePackageRepository {
         downloadUrl = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.task",
         runtimeLabel = "MediaPipe LLM"
     )
+
+    private val premiumModelPackIds = setOf(
+        "ocr-advanced",
+        assistantQwenPack.id
+    )
+
+    private const val premiumRequiredError = "TranTools Pro subscription required."
 }

@@ -15,12 +15,16 @@ import com.neil.trantools.domain.chat.BuildLocalAssistantResponseUseCase
 import com.neil.trantools.domain.chat.MediaPipeAssistantChatEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicLong
@@ -32,6 +36,7 @@ class ChatViewModel @Inject constructor(
 ) : AndroidViewModel(application) {
     private val appContext = getApplication<Application>().applicationContext
     private val messageId = AtomicLong(1L)
+    private val generationSequence = AtomicLong(1L)
     private val mediaPipeAssistantChatEngine = MediaPipeAssistantChatEngine(
         context = appContext,
         fallbackAnswer = appContext.getString(R.string.chat_no_match)
@@ -48,10 +53,16 @@ class ChatViewModel @Inject constructor(
     )
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+    private var activeAnswerJob: Job? = null
+    @Volatile
+    private var activeGenerationId: Long = 0L
 
     init {
         viewModelScope.launch {
             loadPersistedMessages()
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            mediaPipeAssistantChatEngine.warmUp()
         }
     }
 
@@ -92,6 +103,27 @@ class ChatViewModel @Inject constructor(
         sendMessage(question)
     }
 
+    fun stopGenerating() {
+        val generationId = activeGenerationId
+        if (generationId == 0L) return
+
+        val partial = _uiState.value.streamingAnswer.trim()
+        activeGenerationId = 0L
+        activeAnswerJob?.cancel(CancellationException("User cancelled generation"))
+        activeAnswerJob = null
+
+        if (partial.isNotBlank()) {
+            appendAssistantMessage(text = partial)
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                isThinking = false,
+                streamingAnswer = ""
+            )
+        }
+    }
+
     private fun sendMessage(raw: String) {
         val question = raw.trim()
         if (question.isEmpty() || _uiState.value.isThinking) return
@@ -110,37 +142,89 @@ class ChatViewModel @Inject constructor(
         )
         persistMessage(userMessage)
 
-        viewModelScope.launch {
-            val answer = withContext(Dispatchers.IO) {
-                buildAssistantResponse(
-                    question = question,
-                    previousUserTurns = currentMessages.filter { it.role == ChatRole.User }.map { it.text },
-                    onPartialAnswer = { partial ->
-                        _uiState.update { state ->
-                            state.copy(
-                                streamingAnswer = partial,
-                                isThinking = true
-                            )
-                        }
+        val generationId = generationSequence.getAndIncrement()
+        activeGenerationId = generationId
+
+        activeAnswerJob = viewModelScope.launch {
+            try {
+                val answer = withContext(Dispatchers.IO) {
+                    withTimeout(ASSISTANT_RESPONSE_TIMEOUT_MS) {
+                        buildAssistantResponse(
+                            question = question,
+                            previousUserTurns = currentMessages.filter { it.role == ChatRole.User }.map { it.text },
+                            onPartialAnswer = { partial ->
+                                if (activeGenerationId != generationId) return@buildAssistantResponse
+                                _uiState.update { state ->
+                                    state.copy(
+                                        streamingAnswer = partial,
+                                        isThinking = true
+                                    )
+                                }
+                            }
+                        )
                     }
+                }
+
+                if (activeGenerationId != generationId) return@launch
+
+                appendAssistantMessage(
+                    text = answer.answer,
+                    sources = answer.sources,
+                    suggestedQuestions = answer.suggestedQuestions
                 )
+                _uiState.update { state ->
+                    state.copy(
+                        isThinking = false,
+                        streamingAnswer = ""
+                    )
+                }
+            } catch (timeout: TimeoutCancellationException) {
+                if (activeGenerationId != generationId) return@launch
+                val partial = _uiState.value.streamingAnswer.trim()
+                appendAssistantMessage(
+                    text = if (partial.isNotBlank()) partial else appContext.getString(R.string.chat_timeout)
+                )
+                _uiState.update { state ->
+                    state.copy(
+                        isThinking = false,
+                        streamingAnswer = ""
+                    )
+                }
+            } catch (_: CancellationException) {
+                if (activeGenerationId != generationId) return@launch
+                _uiState.update { state ->
+                    state.copy(
+                        isThinking = false,
+                        streamingAnswer = ""
+                    )
+                }
+            } finally {
+                if (activeGenerationId == generationId) {
+                    activeGenerationId = 0L
+                    activeAnswerJob = null
+                }
             }
-
-            val assistantMessage = ChatMessage(
-                id = messageId.getAndIncrement(),
-                role = ChatRole.Assistant,
-                text = answer.answer,
-                sources = answer.sources,
-                suggestedQuestions = answer.suggestedQuestions
-            )
-
-            _uiState.value = _uiState.value.copy(
-                messages = _uiState.value.messages + assistantMessage,
-                isThinking = false,
-                streamingAnswer = ""
-            )
-            persistMessage(assistantMessage)
         }
+    }
+
+    private fun appendAssistantMessage(
+        text: String,
+        sources: List<ChatSource> = emptyList(),
+        suggestedQuestions: List<String> = emptyList(),
+    ) {
+        val normalizedText = text.trim()
+        if (normalizedText.isBlank()) return
+        val assistantMessage = ChatMessage(
+            id = messageId.getAndIncrement(),
+            role = ChatRole.Assistant,
+            text = normalizedText,
+            sources = sources,
+            suggestedQuestions = suggestedQuestions
+        )
+        _uiState.update { state ->
+            state.copy(messages = state.messages + assistantMessage)
+        }
+        persistMessage(assistantMessage)
     }
 
     private fun persistMessage(message: ChatMessage) {
@@ -226,3 +310,5 @@ private fun parseSources(array: JSONArray): List<ChatSource> {
         }.getOrNull()
     }
 }
+
+private const val ASSISTANT_RESPONSE_TIMEOUT_MS = 45_000L

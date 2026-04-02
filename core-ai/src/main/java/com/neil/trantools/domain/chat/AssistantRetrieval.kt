@@ -229,30 +229,25 @@ internal fun rankWikiCitations(
     maxResults: Int,
 ): List<AssistantCitation> {
     return articles.mapNotNull { article ->
-        val metadata = buildString {
-            append(article.title)
-            append(' ')
-            append(article.place)
-            append(' ')
-            append(article.category.name)
-            append(' ')
-            append(article.tags.joinToString(" "))
-        }.lowercase()
+        val tagsText = article.tags.joinToString(" ")
+        val extraText = "${article.category.name} ${article.summary} ${article.fact}".lowercase()
         val snippets = listOf(article.summary, article.fact) + article.content.take(2)
         val bestSnippet = snippets
             .map { snippet ->
                 snippet to scoreCandidate(
-                    metadata = metadata,
-                    primaryTitle = article.title,
+                    title = article.title,
+                    subtitle = article.place,
+                    tags = tagsText,
                     snippet = snippet,
                     expandedQuestion = expandedQuestion,
-                    keywords = keywords
+                    keywords = keywords,
+                    extraText = extraText
                 )
             }
             .maxByOrNull { it.second }
             ?: return@mapNotNull null
 
-        if (bestSnippet.second <= 0) return@mapNotNull null
+        if (bestSnippet.second < MIN_WIKI_CITATION_SCORE) return@mapNotNull null
 
         AssistantCitation(
             id = article.id,
@@ -275,31 +270,26 @@ private fun rankPoiCitations(
     intent: AssistantIntent,
 ): List<AssistantCitation> {
     return pois.mapNotNull { poi ->
-        val metadata = buildString {
-            append(poi.title)
-            append(' ')
-            append(poi.category.name)
-            append(' ')
-            append(poi.address)
-            append(' ')
-            append(poi.tags.joinToString(" "))
-        }.lowercase()
+        val tagsText = poi.tags.joinToString(" ")
+        val extraText = "${poi.category.name} ${poi.bestTime} ${poi.recommendedDuration}".lowercase()
         val snippets = listOf(poi.summary, poi.tip, poi.bestTime, poi.recommendedDuration)
             .filter { it.isNotBlank() }
         val bestSnippet = snippets
             .map { snippet ->
                 snippet to scoreCandidate(
-                    metadata = metadata,
-                    primaryTitle = poi.title,
+                    title = poi.title,
+                    subtitle = poi.address,
+                    tags = tagsText,
                     snippet = snippet,
                     expandedQuestion = expandedQuestion,
-                    keywords = keywords
+                    keywords = keywords,
+                    extraText = extraText
                 ) + if (intent == AssistantIntent.Nearby || intent == AssistantIntent.Mixed) 3 else 0
             }
             .maxByOrNull { it.second }
             ?: return@mapNotNull null
 
-        if (bestSnippet.second <= 0) return@mapNotNull null
+        if (bestSnippet.second < MIN_POI_CITATION_SCORE) return@mapNotNull null
 
         AssistantCitation(
             id = poi.id,
@@ -327,14 +317,20 @@ private fun rankHistoryCitations(
     return history.mapNotNull { item ->
         val snippet = "${item.sourceText} -> ${item.translatedText}"
         val score = scoreCandidate(
-            metadata = snippet.lowercase(),
-            primaryTitle = item.sourceText,
+            title = item.sourceText,
+            subtitle = when (item.mode) {
+                HistoryMode.TEXT -> translateHistoryLabel
+                HistoryMode.OCR -> photoHistoryLabel
+                HistoryMode.VOICE -> voiceHistoryLabel
+            },
+            tags = "",
             snippet = snippet,
             expandedQuestion = expandedQuestion,
-            keywords = keywords
+            keywords = keywords,
+            extraText = "${item.sourceLanguage} ${item.targetLanguage}"
         ) + if (intent == AssistantIntent.Translation || intent == AssistantIntent.Mixed) 4 else 0
 
-        if (score <= 0) return@mapNotNull null
+        if (score < MIN_HISTORY_CITATION_SCORE) return@mapNotNull null
 
         AssistantCitation(
             id = item.id.toString(),
@@ -383,35 +379,74 @@ private fun tokenize(value: String): Set<String> {
         .lowercase()
         .split(Regex("[^\\p{L}\\p{N}]+"))
         .filter { it.length >= 2 }
+        .filterNot { token -> token in retrievalStopWords }
         .toSet()
 }
 
 private fun scoreCandidate(
-    metadata: String,
-    primaryTitle: String,
+    title: String,
+    subtitle: String,
+    tags: String,
     snippet: String,
     expandedQuestion: String,
     keywords: Set<String>,
+    extraText: String = "",
 ): Int {
     val normalizedQuestion = expandedQuestion.lowercase()
+    val normalizedTitle = title.lowercase()
+    val normalizedSubtitle = subtitle.lowercase()
+    val normalizedTags = tags.lowercase()
     val normalizedSnippet = snippet.lowercase()
-    val normalizedTitle = primaryTitle.lowercase()
+    val normalizedExtra = extraText.lowercase()
     var score = 0
 
+    var matchedKeywords = 0
     keywords.forEach { keyword ->
-        if (metadata.contains(keyword)) score += 4
-        if (normalizedSnippet.contains(keyword)) score += 3
+        var matched = false
+        if (normalizedTitle.contains(keyword)) {
+            score += 12
+            matched = true
+        }
+        if (normalizedTags.contains(keyword)) {
+            score += 8
+            matched = true
+        }
+        if (normalizedSubtitle.contains(keyword)) {
+            score += 5
+            matched = true
+        }
+        if (normalizedSnippet.contains(keyword)) {
+            score += 4
+            matched = true
+        }
+        if (normalizedExtra.contains(keyword)) {
+            score += 2
+            matched = true
+        }
+        if (matched) matchedKeywords += 1
     }
 
     if (normalizedQuestion.contains(normalizedTitle)) {
-        score += 8
+        score += 12
     }
     if (normalizedSnippet.contains(normalizedQuestion)) {
         score += 6
     }
+    if (normalizedQuestion.contains(normalizedSubtitle) && normalizedSubtitle.isNotBlank()) {
+        score += 4
+    }
+    if (matchedKeywords == 0) {
+        score -= 6
+    } else {
+        score += matchedKeywords * 2
+    }
 
     return max(score, 0)
 }
+
+private const val MIN_WIKI_CITATION_SCORE = 10
+private const val MIN_POI_CITATION_SCORE = 10
+private const val MIN_HISTORY_CITATION_SCORE = 9
 
 private val nearbyKeywords = setOf(
     "nearby",
@@ -447,4 +482,49 @@ private val translationKeywords = setOf(
     "礼貌",
     "表达",
     "说"
+)
+
+private val retrievalStopWords = setOf(
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    "that",
+    "this",
+    "what",
+    "where",
+    "when",
+    "which",
+    "how",
+    "why",
+    "who",
+    "you",
+    "your",
+    "are",
+    "was",
+    "were",
+    "can",
+    "could",
+    "would",
+    "should",
+    "into",
+    "onto",
+    "about",
+    "have",
+    "has",
+    "had",
+    "there",
+    "their",
+    "them",
+    "our",
+    "ours",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "by",
+    "an",
+    "or"
 )
