@@ -84,6 +84,8 @@
     <string name="home_status_1">Core navigation is wired</string>
     <string name="home_status_2">Dependency foundation is ready</string>
     <string name="home_status_3">Translate remains the highest-priority next step</string>
+    <string name="home_recent_history_title">Recent Translation History</string>
+    <string name="home_recent_history_empty">No recent translations yet. Try text, voice, or photo translation first.</string>
 
     <string name="history_title">History</string>
     <string name="history_clear_all">Clear all</string>

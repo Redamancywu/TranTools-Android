@@ -2,15 +2,19 @@ package com.neil.trantools.feature.home
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.neil.trantools.core.ui.R
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Translate
+import com.neil.trantools.data.history.HistoryStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
@@ -58,4 +62,16 @@ class HomeViewModel @Inject constructor(
         )
     )
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            runCatching {
+                HistoryStore.observeAll().collect { list ->
+                    _uiState.update { state ->
+                        state.copy(recentHistory = list.take(3))
+                    }
+                }
+            }
+        }
+    }
 }

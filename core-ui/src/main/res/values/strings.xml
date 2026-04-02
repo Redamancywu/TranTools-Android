@@ -85,6 +85,8 @@
     <string name="home_status_1">基础导航已接入</string>
     <string name="home_status_2">依赖基建已完成</string>
     <string name="home_status_3">下一步优先实现 Translate</string>
+    <string name="home_recent_history_title">最近翻译历史</string>
+    <string name="home_recent_history_empty">暂无最近翻译，先去试试文本、语音或拍照翻译。</string>
 
     <string name="history_title">历史记录</string>
     <string name="history_clear_all">全部清空</string>

@@ -47,7 +47,23 @@ fun TranToolsNavHost(
                 onOpenSettings = { appState.navController.navigate(settingsRoute) },
                 onOpenChat = { appState.navController.navigate(chatRoute) },
                 onOpenTranslate = { appState.navigateToTopLevel(TopLevelDestination.Translate.route) },
-                onOpenVoice = { appState.navigateToTopLevel(TopLevelDestination.Voice.route) }
+                onOpenVoice = { appState.navigateToTopLevel(TopLevelDestination.Voice.route) },
+                onOpenRecentHistory = { item ->
+                    when (item.mode) {
+                        HistoryMode.TEXT,
+                        HistoryMode.OCR -> {
+                            selectedTranslateHistoryItem = item
+                            selectedVoiceHistoryItem = null
+                            appState.navigateToTopLevel(TopLevelDestination.Translate.route)
+                        }
+
+                        HistoryMode.VOICE -> {
+                            selectedVoiceHistoryItem = item
+                            selectedTranslateHistoryItem = null
+                            appState.navigateToTopLevel(TopLevelDestination.Voice.route)
+                        }
+                    }
+                }
             )
         }
 

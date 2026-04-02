@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +46,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.neil.trantools.core.ui.R
+import com.neil.trantools.data.history.HistoryMode
+import com.neil.trantools.data.history.TranslationHistoryEntity
+import com.neil.trantools.feature.translate.displayLabel
+import com.neil.trantools.feature.translate.translateLanguageFromStored
 import com.neil.trantools.ui.theme.TranToolsTheme
 
 @Composable
@@ -55,7 +60,9 @@ fun HomeScreen(
     onOpenChat: () -> Unit = {},
     onOpenTranslate: () -> Unit = {},
     onOpenVoice: () -> Unit = {},
+    onOpenRecentHistory: (TranslationHistoryEntity) -> Unit = {},
 ) {
+    val context = LocalContext.current
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -348,6 +355,72 @@ fun HomeScreen(
                 }
             }
         }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.home_recent_history_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    if (uiState.recentHistory.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.home_recent_history_empty),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        uiState.recentHistory.forEach { item ->
+                            Card(
+                                onClick = { onOpenRecentHistory(item) },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainerLowest)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = historyModeLabel(item.mode),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${translateLanguageFromStored(item.sourceLanguage).displayLabel(context)} -> ${translateLanguageFromStored(item.targetLanguage).displayLabel(context)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = item.sourceText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun historyModeLabel(mode: HistoryMode): String {
+    return when (mode) {
+        HistoryMode.TEXT -> stringResource(R.string.history_mode_text)
+        HistoryMode.OCR -> stringResource(R.string.history_mode_ocr)
+        HistoryMode.VOICE -> stringResource(R.string.history_mode_voice)
     }
 }
 
