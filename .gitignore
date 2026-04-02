@@ -1,0 +1,17 @@
+# Gradle / build outputs
+.gradle/
+**/build/
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# Local configuration
+local.properties
+
+# OS files
+.DS_Store
+
+# Kapt / Kotlin caches
+.kotlinc/
+.kotlin/
