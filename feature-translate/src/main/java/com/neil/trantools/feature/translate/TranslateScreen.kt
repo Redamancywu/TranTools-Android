@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Paint
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -72,6 +73,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.toClipEntry
@@ -821,6 +823,8 @@ private fun CameraTranslatePane(
 
                 OcrOverlay(
                     regions = uiState.recognizedRegions,
+                    translatedLines = uiState.translatedLines,
+                    fallbackLines = uiState.recognizedLines,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
@@ -892,6 +896,8 @@ private fun CameraTranslatePane(
 @Composable
 private fun OcrOverlay(
     regions: List<RecognizedRegion>,
+    translatedLines: List<String>,
+    fallbackLines: List<String>,
     modifier: Modifier = Modifier,
 ) {
     if (regions.isEmpty()) return
@@ -900,14 +906,20 @@ private fun OcrOverlay(
         val strokeWidth = 3.dp.toPx()
         val boxColor = Color(0xFF73F1E7).copy(alpha = 0.85f)
         val bgColor = Color(0xFF006762).copy(alpha = 0.12f)
+        val labelBgColor = Color(0xFF006762).copy(alpha = 0.65f)
+        val textPaint = Paint().apply {
+            color = android.graphics.Color.WHITE
+            textSize = 12.dp.toPx()
+            isAntiAlias = true
+        }
 
-        regions.forEach { region ->
+        regions.forEachIndexed { index, region ->
             val left = region.left.coerceIn(0f, 1f) * size.width
             val top = region.top.coerceIn(0f, 1f) * size.height
             val right = region.right.coerceIn(0f, 1f) * size.width
             val bottom = region.bottom.coerceIn(0f, 1f) * size.height
 
-            if (right <= left || bottom <= top) return@forEach
+            if (right <= left || bottom <= top) return@forEachIndexed
 
             drawRect(
                 color = bgColor,
@@ -920,8 +932,50 @@ private fun OcrOverlay(
                 size = Size(right - left, bottom - top),
                 style = Stroke(width = strokeWidth)
             )
+
+            val label = translatedLines.getOrNull(index)
+                ?.takeIf { it.isNotBlank() }
+                ?: fallbackLines.getOrNull(index).orEmpty()
+            if (label.isNotBlank()) {
+                val horizontalPadding = 6.dp.toPx()
+                val verticalPadding = 4.dp.toPx()
+                val baselineY = (top + 16.dp.toPx()).coerceAtMost(bottom - 4.dp.toPx())
+                val maxLabelWidth = (right - left - horizontalPadding * 2f).coerceAtLeast(40.dp.toPx())
+                val text = ellipsizeToWidth(label, textPaint, maxLabelWidth)
+                val textWidth = textPaint.measureText(text)
+                drawRect(
+                    color = labelBgColor,
+                    topLeft = Offset(left, top),
+                    size = Size(
+                        width = (textWidth + horizontalPadding * 2f).coerceAtMost(right - left),
+                        height = textPaint.textSize + verticalPadding * 2f
+                    )
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    text,
+                    left + horizontalPadding,
+                    baselineY,
+                    textPaint
+                )
+            }
         }
     }
+}
+
+private fun ellipsizeToWidth(
+    input: String,
+    paint: Paint,
+    maxWidth: Float,
+): String {
+    if (paint.measureText(input) <= maxWidth) return input
+    val ellipsis = "…"
+    val maxContentWidth = (maxWidth - paint.measureText(ellipsis)).coerceAtLeast(0f)
+    var end = input.length
+    while (end > 0 && paint.measureText(input, 0, end) > maxContentWidth) {
+        end--
+    }
+    if (end <= 0) return ellipsis
+    return input.substring(0, end) + ellipsis
 }
 
 @Composable
