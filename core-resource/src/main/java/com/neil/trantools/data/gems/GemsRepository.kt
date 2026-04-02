@@ -1,6 +1,12 @@
 package com.neil.trantools.data.gems
 
 import android.content.Context
+import com.neil.trantools.data.content.LocalContentStore
+import com.neil.trantools.data.content.PoiEntity
+import com.neil.trantools.data.content.PoiFtsEntity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
 object GemsRepository {
@@ -8,6 +14,13 @@ object GemsRepository {
 
     fun loadPois(context: Context): List<GemPoi> {
         val language = context.resources.configuration.locales[0]?.language ?: "en"
+        val indexedPois = runCatching {
+            runBlocking { LocalContentStore.getPois(language).map { it.toDomain() } }
+        }.getOrDefault(emptyList())
+        if (indexedPois.isNotEmpty()) {
+            cache[language] = indexedPois
+            return indexedPois
+        }
         return cache.getOrPut(language) {
             val assetName = if (language.startsWith("zh")) {
                 "gems_pois_zh.json"
@@ -61,6 +74,48 @@ object GemsRepository {
         pois: List<GemPoi>,
         id: String,
     ): GemPoi? = pois.firstOrNull { it.id == id }
+
+    suspend fun syncIndexIfNeeded(context: Context) {
+        val language = context.resources.configuration.locales[0]?.language ?: "en"
+        if (LocalContentStore.poiCount(language) > 0) return
+        val pois = withContext(Dispatchers.IO) {
+            val assetName = if (language.startsWith("zh")) {
+                "gems_pois_zh.json"
+            } else {
+                "gems_pois_en.json"
+            }
+            context.assets.open(assetName).bufferedReader().use { reader ->
+                parsePois(reader.readText())
+            }
+        }
+        LocalContentStore.replacePois(
+            language = language,
+            entities = pois.map { it.toEntity(language) },
+            ftsEntities = pois.mapIndexed { index, poi ->
+                poi.toFtsEntity(language = language, rowId = index + 1)
+            }
+        )
+        cache[language] = pois
+    }
+
+    suspend fun searchIndexedPois(
+        context: Context,
+        query: String,
+        limit: Int = 12,
+    ): List<GemPoi> {
+        syncIndexIfNeeded(context)
+        val language = context.resources.configuration.locales[0]?.language ?: "en"
+        val dbPois = LocalContentStore.getPois(language)
+        if (query.isBlank()) return dbPois.map { it.toDomain() }.take(limit)
+        val ids = LocalContentStore.searchPoiIds(
+            language = language,
+            query = buildFtsQuery(query),
+            limit = limit
+        )
+        if (ids.isEmpty()) return dbPois.map { it.toDomain() }.take(limit)
+        val byId = dbPois.associateBy { it.id }
+        return ids.mapNotNull { id -> byId[id]?.toDomain() }
+    }
 
     private fun parsePois(json: String): List<GemPoi> {
         val array = JSONArray(json)
@@ -125,4 +180,66 @@ private fun JSONArray.toStringList(): List<String> {
             add(getString(index))
         }
     }
+}
+
+private fun GemPoi.toEntity(language: String): PoiEntity {
+    return PoiEntity(
+        id = id,
+        language = language,
+        title = title,
+        category = category.name,
+        summary = summary,
+        tip = tip,
+        address = address,
+        latitude = latitude,
+        longitude = longitude,
+        rating = rating,
+        tagsBlob = tags.joinToString(separator = "\u001F"),
+        bestTime = bestTime,
+        recommendedDuration = recommendedDuration,
+        budgetLevel = budgetLevel
+    )
+}
+
+private fun GemPoi.toFtsEntity(
+    language: String,
+    rowId: Int,
+): PoiFtsEntity {
+    return PoiFtsEntity(
+        rowId = rowId,
+        poiId = id,
+        language = language,
+        title = title,
+        category = category.name,
+        summary = summary,
+        tip = tip,
+        address = address,
+        tags = tags.joinToString(" ")
+    )
+}
+
+private fun PoiEntity.toDomain(): GemPoi {
+    return GemPoi(
+        id = id,
+        title = title,
+        category = GemCategory.valueOf(category),
+        summary = summary,
+        tip = tip,
+        address = address,
+        latitude = latitude,
+        longitude = longitude,
+        rating = rating,
+        tags = tagsBlob.split("\u001F").filter { it.isNotBlank() },
+        bestTime = bestTime,
+        recommendedDuration = recommendedDuration,
+        budgetLevel = budgetLevel
+    )
+}
+
+private fun buildFtsQuery(raw: String): String {
+    return raw.trim()
+        .split(Regex("[^\\p{L}\\p{N}]+"))
+        .filter { it.length >= 2 }
+        .joinToString(" OR ") { token -> "$token*" }
+        .ifBlank { raw.trim() }
 }

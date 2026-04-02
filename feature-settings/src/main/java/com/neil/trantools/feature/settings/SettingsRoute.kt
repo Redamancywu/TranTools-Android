@@ -1,5 +1,6 @@
 package com.neil.trantools.feature.settings
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
@@ -47,9 +48,12 @@ fun SettingsRoute(
         } else {
             SubscriptionState.Free
         },
-        onSubscribeClick = { viewModel.setSubscriptionState(LocalSubscriptionState.Pro) },
-        onRestorePurchaseClick = { viewModel.setSubscriptionState(LocalSubscriptionState.Pro) },
-        onManageSubscriptionClick = { viewModel.setSubscriptionState(LocalSubscriptionState.Free) },
+        onSubscribeClick = {
+            val activity = context as? Activity ?: return@SettingsScreen
+            viewModel.subscribe(activity)
+        },
+        onRestorePurchaseClick = viewModel::restorePurchase,
+        onManageSubscriptionClick = { viewModel.manageSubscription(context) },
         onInstallModelPack = viewModel::installModelPack,
         onRemoveModelPack = viewModel::removeModelPack,
         onDownloadCityPack = viewModel::downloadCityPack,

@@ -148,6 +148,7 @@
     <string name="translate_error_no_image">没有获取到图像</string>
     <string name="translate_error_no_text">未识别到文本</string>
     <string name="translate_error_ocr_failed">OCR 失败</string>
+    <string name="translate_error_offline_pack_missing">当前为离线模式，缺少本地语言包，无法完成翻译。</string>
     <string name="translate_capture">拍摄</string>
 
     <string name="voice_tab_realtime">实时对话</string>
@@ -168,6 +169,7 @@
     <string name="voice_error_no_speech">未识别到语音内容</string>
     <string name="voice_error_unavailable">当前设备不支持语音识别</string>
     <string name="voice_error_code">语音识别错误代码：%1$d</string>
+    <string name="voice_error_offline_pack_missing">当前为离线模式，缺少本地语言包，语音翻译已降级为原文显示。</string>
 
     <string name="gems_pin_hidden_shrine">隐秘神社</string>
     <string name="gems_pin_bamboo_path">竹林小径</string>
@@ -262,6 +264,8 @@
     <string name="settings_pack_loading">处理中</string>
     <string name="settings_pack_installed">已安装</string>
     <string name="settings_pack_not_installed">未安装</string>
+    <string name="settings_pack_progress">下载中 %1$d%%</string>
+    <string name="settings_pack_failed">下载失败</string>
     <string name="settings_pack_size">大小 %1$d MB</string>
     <string name="settings_pack_pro_only">Pro 权益</string>
     <string name="settings_pack_poi_count">包含 %1$d 个 POI</string>

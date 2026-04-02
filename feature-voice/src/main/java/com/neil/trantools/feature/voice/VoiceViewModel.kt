@@ -11,6 +11,7 @@ import com.neil.trantools.core.ui.R
 import com.neil.trantools.data.history.HistoryMode
 import com.neil.trantools.data.history.HistoryStore
 import com.neil.trantools.data.history.TranslationHistoryEntity
+import com.neil.trantools.data.settings.BehaviorPreferencesStore
 import com.neil.trantools.data.translation.TranslationModelStore
 import com.neil.trantools.domain.history.MapVoiceHistoryItemUseCase
 import com.neil.trantools.feature.translate.TranslateLanguageOption
@@ -158,6 +159,9 @@ class VoiceViewModel @Inject constructor(
 
     private fun translateAndAppend(sourceText: String) {
         viewModelScope.launch {
+            val offlineOnly = runCatching {
+                BehaviorPreferencesStore.isOfflineOnly(getApplication())
+            }.getOrDefault(false)
             val currentSourceLanguage = _uiState.value.sourceLanguage
             val currentTargetLanguage = _uiState.value.targetLanguage
             val autoTurn = _uiState.value.autoTurnTaking
@@ -170,10 +174,19 @@ class VoiceViewModel @Inject constructor(
                 runCatching {
                     withContext(Dispatchers.IO) {
                         val translatorClient = ensureTranslator(sourceCode, targetCode)
-                        Tasks.await(translatorClient.downloadModelIfNeeded())
+                        if (!offlineOnly) {
+                            Tasks.await(translatorClient.downloadModelIfNeeded())
+                        }
                         Tasks.await(translatorClient.translate(sourceText))
                     }
-                }.getOrElse { sourceText }
+                }.getOrElse {
+                    if (offlineOnly) {
+                        _uiState.value = _uiState.value.copy(
+                            errorMessage = getApplication<Application>().getString(R.string.voice_error_offline_pack_missing)
+                        )
+                    }
+                    sourceText
+                }
             }
 
             val newMessage = VoiceMessage(

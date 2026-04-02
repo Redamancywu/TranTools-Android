@@ -19,4 +19,5 @@ data class ChatUiState(
     val input: String = "",
     val messages: List<ChatMessage> = emptyList(),
     val isThinking: Boolean = false,
+    val streamingAnswer: String = "",
 )

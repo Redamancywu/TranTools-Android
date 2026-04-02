@@ -1,11 +1,14 @@
 package com.neil.trantools.feature.settings
 
 import android.app.Application
+import android.app.Activity
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.neil.trantools.core.resource.ThemeStyleStore
 import com.neil.trantools.data.settings.BehaviorPreferencesStore
 import com.neil.trantools.data.settings.LocalSubscriptionState
+import com.neil.trantools.data.settings.PlayBillingStore
 import com.neil.trantools.data.settings.ResourcePackageRepository
 import com.neil.trantools.data.settings.SubscriptionStore
 import com.neil.trantools.data.translation.TranslationModelStore
@@ -16,7 +19,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -28,6 +30,7 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        PlayBillingStore.init(appContext)
         viewModelScope.launch {
             ThemeStyleStore.observe(appContext).collect { style ->
                 _uiState.value = _uiState.value.copy(themeStyle = style)
@@ -36,6 +39,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             SubscriptionStore.observe(appContext).collect { state ->
                 _uiState.value = _uiState.value.copy(subscriptionState = state)
+            }
+        }
+        viewModelScope.launch {
+            PlayBillingStore.observeState().collect { state ->
+                if (state != null) {
+                    _uiState.value = _uiState.value.copy(subscriptionState = state)
+                }
             }
         }
         viewModelScope.launch {
@@ -96,6 +106,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             SubscriptionStore.set(appContext, state)
         }
+    }
+
+    fun subscribe(activity: Activity) {
+        PlayBillingStore.launchSubscribe(activity)
+    }
+
+    fun restorePurchase() {
+        PlayBillingStore.restorePurchases()
+    }
+
+    fun manageSubscription(context: Context) {
+        PlayBillingStore.openManageSubscriptions(context)
     }
 
     fun setOfflineOnlyMode(value: Boolean) {

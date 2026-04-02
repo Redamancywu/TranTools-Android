@@ -16,7 +16,7 @@ class BuildLocalAssistantResponseUseCaseTest {
     @Test
     fun `combine wiki gem and history sources into one answer`() {
         val useCase = BuildLocalAssistantResponseUseCase(
-            wikiProvider = {
+            wikiProvider = { _, _ ->
                 listOf(
                     WikiArticle(
                         id = "kiyomizu",
@@ -30,7 +30,7 @@ class BuildLocalAssistantResponseUseCaseTest {
                     )
                 )
             },
-            gemsProvider = {
+            gemsProvider = { _, _ ->
                 listOf(
                     GemPoi(
                         id = "kiyomizu-dera",

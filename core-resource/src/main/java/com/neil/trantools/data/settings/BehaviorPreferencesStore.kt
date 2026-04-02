@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.behaviorDataStore by preferencesDataStore(name = "behavior_preferences")
@@ -33,5 +34,11 @@ object BehaviorPreferencesStore {
 
     suspend fun setHighQualityOcr(context: Context, value: Boolean) {
         context.behaviorDataStore.edit { it[KEY_HIGH_QUALITY_OCR] = value }
+    }
+
+    suspend fun isOfflineOnly(context: Context): Boolean {
+        return context.behaviorDataStore.data
+            .map { it[KEY_OFFLINE_ONLY] ?: true }
+            .first()
     }
 }

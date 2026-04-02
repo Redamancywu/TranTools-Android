@@ -19,6 +19,7 @@ import com.google.mlkit.nl.translate.Translator
 import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.nl.translate.Translation
 import com.neil.trantools.data.translation.FavoritePhrase
+import com.neil.trantools.data.settings.BehaviorPreferencesStore
 import com.neil.trantools.data.translation.TranslationModelStore
 import com.neil.trantools.data.translation.TranslatePhraseStore
 import com.neil.trantools.domain.history.MapTranslateHistoryItemUseCase
@@ -115,19 +116,28 @@ class TranslateViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
+            val offlineOnly = runCatching {
+                BehaviorPreferencesStore.isOfflineOnly(getApplication())
+            }.getOrDefault(false)
             val translated = runCatching {
                 withContext(Dispatchers.IO) {
                     val translatorClient = ensureTranslator(
                         sourceLanguage = sourceCode,
                         targetLanguage = targetCode
                     )
-                    Tasks.await(translatorClient.downloadModelIfNeeded())
+                    if (!offlineOnly) {
+                        Tasks.await(translatorClient.downloadModelIfNeeded())
+                    }
                     Tasks.await(translatorClient.translate(input))
                 }
             }.getOrElse { error ->
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
-                    errorMessage = error.message ?: getApplication<Application>().getString(R.string.translate_error_translation_failed)
+                    errorMessage = if (offlineOnly) {
+                        getApplication<Application>().getString(R.string.translate_error_offline_pack_missing)
+                    } else {
+                        error.message ?: getApplication<Application>().getString(R.string.translate_error_translation_failed)
+                    }
                 )
                 return@launch
             }
@@ -425,6 +435,9 @@ class TranslateViewModel @Inject constructor(
 
     private fun translateRecognizedLines(lines: List<String>) {
         viewModelScope.launch {
+            val offlineOnly = runCatching {
+                BehaviorPreferencesStore.isOfflineOnly(getApplication())
+            }.getOrDefault(false)
             val sourceCode = _uiState.value.sourceLanguage.toMlKitCode()
             val targetCode = _uiState.value.targetLanguage.toMlKitCode()
             if (sourceCode == null || targetCode == null || sourceCode == targetCode) {
@@ -442,10 +455,17 @@ class TranslateViewModel @Inject constructor(
                         targetLanguage = targetCode
                     )
 
-                    Tasks.await(translatorClient.downloadModelIfNeeded())
+                    if (!offlineOnly) {
+                        Tasks.await(translatorClient.downloadModelIfNeeded())
+                    }
                     lines.map { source -> Tasks.await(translatorClient.translate(source)) }
                 }
             }.getOrElse {
+                if (offlineOnly) {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = getApplication<Application>().getString(R.string.translate_error_offline_pack_missing)
+                    )
+                }
                 lines
             }
 

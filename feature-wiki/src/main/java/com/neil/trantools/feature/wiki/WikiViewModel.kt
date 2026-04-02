@@ -87,11 +87,18 @@ class WikiViewModel @Inject constructor(
     }
 
     fun askQuestion() {
-        answer.value = WikiAnswerEngine.answer(
-            question = question.value,
-            articles = allArticles.value,
-            fallbackAnswer = appContext.getString(R.string.wiki_qa_no_match)
-        )
+        viewModelScope.launch {
+            val indexedArticles = WikiRepository.searchIndexedArticles(
+                context = appContext,
+                query = question.value,
+                limit = 6
+            )
+            answer.value = WikiAnswerEngine.answer(
+                question = question.value,
+                articles = indexedArticles.ifEmpty { allArticles.value },
+                fallbackAnswer = appContext.getString(R.string.wiki_qa_no_match)
+            )
+        }
     }
 
     fun applyQuestion(value: String, autoAsk: Boolean) {

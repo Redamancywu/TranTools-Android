@@ -140,6 +140,20 @@ fun ChatScreen(
                     onOpenGemDetail = onOpenGemDetail
                 )
             }
+            if (uiState.streamingAnswer.isNotBlank()) {
+                item {
+                    ChatBubble(
+                        message = ChatMessage(
+                            id = -1,
+                            role = ChatRole.Assistant,
+                            text = uiState.streamingAnswer
+                        ),
+                        onUseSuggestedQuestion = onUseSuggestedQuestion,
+                        onOpenWikiArticle = onOpenWikiArticle,
+                        onOpenGemDetail = onOpenGemDetail
+                    )
+                }
+            }
             if (uiState.isThinking) {
                 item {
                     Text(
@@ -283,6 +297,13 @@ private fun SourceCard(
             Column {
                 Text(source.title, fontWeight = FontWeight.Bold)
                 Text(source.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (source.detail.isNotBlank()) {
+                    Text(
+                        text = source.detail,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     }

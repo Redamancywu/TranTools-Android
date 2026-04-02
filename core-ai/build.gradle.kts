@@ -10,5 +10,6 @@ dependencies {
     implementation(project(":core-model"))
     implementation(project(":core-database"))
     implementation(project(":core-resource"))
+    implementation(libs.google.mediapipe.tasks.genai)
     testImplementation(libs.junit)
 }

@@ -12,11 +12,13 @@ import com.neil.trantools.data.gems.GemsRepository
 import com.neil.trantools.data.history.HistoryStore
 import com.neil.trantools.data.wiki.WikiRepository
 import com.neil.trantools.domain.chat.BuildLocalAssistantResponseUseCase
+import com.neil.trantools.domain.chat.MediaPipeAssistantChatEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -30,14 +32,19 @@ class ChatViewModel @Inject constructor(
 ) : AndroidViewModel(application) {
     private val appContext = getApplication<Application>().applicationContext
     private val messageId = AtomicLong(1L)
+    private val mediaPipeAssistantChatEngine = MediaPipeAssistantChatEngine(
+        context = appContext,
+        fallbackAnswer = appContext.getString(R.string.chat_no_match)
+    )
     private val buildAssistantResponse = BuildLocalAssistantResponseUseCase(
-        wikiProvider = { WikiRepository.loadArticles(appContext) },
-        gemsProvider = { GemsRepository.loadPois(appContext) },
+        wikiProvider = { question, limit -> WikiRepository.searchIndexedArticles(appContext, question, limit) },
+        gemsProvider = { question, limit -> GemsRepository.searchIndexedPois(appContext, question, limit) },
         historyProvider = { limit -> HistoryStore.getRecent(limit) },
         fallbackAnswer = appContext.getString(R.string.chat_no_match),
         translateHistoryLabel = appContext.getString(R.string.chat_history_translate),
         photoHistoryLabel = appContext.getString(R.string.chat_history_photo),
-        voiceHistoryLabel = appContext.getString(R.string.chat_history_voice)
+        voiceHistoryLabel = appContext.getString(R.string.chat_history_voice),
+        chatEngineProvider = { mediaPipeAssistantChatEngine }
     )
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -98,7 +105,8 @@ class ChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             input = "",
             messages = currentMessages + userMessage,
-            isThinking = true
+            isThinking = true,
+            streamingAnswer = ""
         )
         persistMessage(userMessage)
 
@@ -106,7 +114,15 @@ class ChatViewModel @Inject constructor(
             val answer = withContext(Dispatchers.IO) {
                 buildAssistantResponse(
                     question = question,
-                    previousUserTurns = currentMessages.filter { it.role == ChatRole.User }.map { it.text }
+                    previousUserTurns = currentMessages.filter { it.role == ChatRole.User }.map { it.text },
+                    onPartialAnswer = { partial ->
+                        _uiState.update { state ->
+                            state.copy(
+                                streamingAnswer = partial,
+                                isThinking = true
+                            )
+                        }
+                    }
                 )
             }
 
@@ -120,7 +136,8 @@ class ChatViewModel @Inject constructor(
 
             _uiState.value = _uiState.value.copy(
                 messages = _uiState.value.messages + assistantMessage,
-                isThinking = false
+                isThinking = false,
+                streamingAnswer = ""
             )
             persistMessage(assistantMessage)
         }
@@ -163,6 +180,7 @@ private fun serializeMetadata(
             put("title", source.title)
             put("subtitle", source.subtitle)
             put("type", source.type.name)
+            put("detail", source.detail)
         }
         array.put(obj)
     }
@@ -201,6 +219,7 @@ private fun parseSources(array: JSONArray): List<ChatSource> {
                 id = obj.getString("id"),
                 title = obj.getString("title"),
                 subtitle = obj.getString("subtitle"),
+                detail = obj.optString("detail"),
                 type = runCatching { ChatSourceType.valueOf(obj.getString("type")) }
                     .getOrDefault(ChatSourceType.Wiki)
             )

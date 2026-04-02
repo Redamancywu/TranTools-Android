@@ -1,9 +1,19 @@
 package com.neil.trantools.data.wiki
 
+import com.neil.trantools.domain.chat.rankWikiCitations
+
+data class WikiAnswerSource(
+    val articleId: String,
+    val title: String,
+    val subtitle: String,
+    val excerpt: String,
+)
+
 data class WikiAnswer(
     val question: String,
     val answer: String,
     val sourceIds: List<String>,
+    val sources: List<WikiAnswerSource> = emptyList(),
     val suggestedQuestions: List<String> = emptyList(),
 )
 
@@ -16,101 +26,60 @@ object WikiAnswerEngine {
         val normalizedQuestion = question.trim()
         if (normalizedQuestion.isEmpty()) return null
 
-        val keywords = normalizedQuestion
-            .lowercase()
-            .split(Regex("[^\\p{L}\\p{N}]+"))
-            .filter { it.length >= 2 }
-            .toSet()
+        val citations = rankWikiCitations(
+            expandedQuestion = normalizedQuestion,
+            keywords = normalizedQuestion
+                .lowercase()
+                .split(Regex("[^\\p{L}\\p{N}]+"))
+                .filter { it.length >= 2 }
+                .toSet(),
+            articles = articles,
+            maxResults = 3
+        )
 
-        val ranked = articles
-            .map { article ->
-                article to scoreArticle(article, keywords, normalizedQuestion)
-            }
-            .filter { it.second > 0 }
-            .sortedByDescending { it.second }
-            .take(3)
-
-        if (ranked.isEmpty()) {
+        if (citations.isEmpty()) {
             return WikiAnswer(
                 question = normalizedQuestion,
                 answer = fallbackAnswer,
                 sourceIds = emptyList(),
+                sources = emptyList(),
                 suggestedQuestions = emptyList()
             )
         }
 
-        val topArticles = ranked.map { it.first }
-        val summary = buildString {
-            append(topArticles.first().summary)
-            topArticles.drop(1).forEach { article ->
-                append(' ')
-                append(article.title)
-                append(": ")
-                append(article.summary)
-            }
-        }
-
-        val supportingPoints = topArticles
-            .flatMap { article -> article.content.take(1).map { "${article.title}: $it" } }
-            .take(3)
-
         val answerText = buildString {
-            append(summary)
-            if (supportingPoints.isNotEmpty()) {
-                append("\n\n")
-                supportingPoints.forEachIndexed { index, point ->
-                    append(index + 1)
-                    append(". ")
-                    append(point)
-                    if (index != supportingPoints.lastIndex) append('\n')
-                }
+            append("Here is what your local knowledge pack says.")
+            append("\n\n")
+            citations.forEachIndexed { index, citation ->
+                append(index + 1)
+                append(". ")
+                append(citation.title)
+                append(": ")
+                append(citation.excerpt)
+                if (index != citations.lastIndex) append('\n')
             }
         }
 
         val suggestedQuestions = buildList {
-            topArticles.forEach { article ->
-                add("What should I know before visiting ${article.title}?")
-                add("Any local etiquette or tips for ${article.title}?")
+            citations.forEach { citation ->
+                add("What should I know before visiting ${citation.title}?")
+                add("Any local etiquette or timing tips for ${citation.title}?")
             }
         }.distinct().take(3)
 
         return WikiAnswer(
             question = normalizedQuestion,
             answer = answerText,
-            sourceIds = topArticles.map { it.id },
+            sourceIds = citations.map { it.id },
+            sources = citations.map { citation ->
+                WikiAnswerSource(
+                    articleId = citation.id,
+                    title = citation.title,
+                    subtitle = citation.subtitle,
+                    excerpt = citation.excerpt
+                )
+            },
             suggestedQuestions = suggestedQuestions
         )
-    }
-
-    private fun scoreArticle(
-        article: WikiArticle,
-        keywords: Set<String>,
-        originalQuestion: String,
-    ): Int {
-        val haystack = buildString {
-            append(article.title)
-            append(' ')
-            append(article.place)
-            append(' ')
-            append(article.summary)
-            append(' ')
-            append(article.fact)
-            append(' ')
-            append(article.content.joinToString(" "))
-            append(' ')
-            append(article.tags.joinToString(" "))
-        }.lowercase()
-
-        var score = 0
-        keywords.forEach { keyword ->
-            if (haystack.contains(keyword)) score += 3
-        }
-        if (haystack.contains(originalQuestion.lowercase())) {
-            score += 5
-        }
-        if (article.title.lowercase() in originalQuestion.lowercase()) {
-            score += 4
-        }
-        return score
     }
 }

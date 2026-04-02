@@ -3,10 +3,11 @@ package com.neil.trantools.data.settings
 import android.content.Context
 import com.neil.trantools.data.gems.GemsRepository
 import com.neil.trantools.data.translation.TranslationModelStore
-import com.neil.trantools.data.wiki.WikiRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import java.io.File
 
 data class ModelPackInfo(
     val id: String,
@@ -15,6 +16,10 @@ data class ModelPackInfo(
     val sizeMb: Int,
     val installed: Boolean,
     val premium: Boolean,
+    val installStatus: ModelPackInstallStatus = if (installed) ModelPackInstallStatus.Ready else ModelPackInstallStatus.NotInstalled,
+    val progressPercent: Int = 0,
+    val errorMessage: String? = null,
+    val runtimeLabel: String? = null,
 )
 
 data class CityPackInfo(
@@ -33,12 +38,25 @@ data class StorageSummary(
     val wikiMb: Int,
 )
 
+private data class DownloadableModelPackDefinition(
+    val id: String,
+    val title: String,
+    val description: String,
+    val sizeMb: Int,
+    val premium: Boolean,
+    val fileName: String,
+    val downloadUrl: String,
+    val runtimeLabel: String,
+)
+
 object ResourcePackageRepository {
     fun observeModelPacks(context: Context): Flow<List<ModelPackInfo>> {
         return combine(
             TranslationModelStore.observeStatuses(),
-            ModelPackStore.observeInstalledIds(context)
-        ) { translationStatuses, installedModelPackIds ->
+            ModelPackStore.observeRecords(context)
+        ) { translationStatuses, records ->
+            val llmRecord = records[assistantQwenPack.id]
+            val ocrRecord = records["ocr-advanced"]
             listOf(
                 ModelPackInfo(
                     id = "translate-core",
@@ -53,16 +71,20 @@ object ResourcePackageRepository {
                     title = "Advanced OCR",
                     description = "Higher quality menu and sign text extraction",
                     sizeMb = 96,
-                    installed = "ocr-advanced" in installedModelPackIds,
+                    installed = ocrRecord?.installed == true,
                     premium = true
                 ),
                 ModelPackInfo(
-                    id = "assistant-local",
-                    title = "Local Assistant Orchestrator",
-                    description = "Local retrieval and response composition pipeline",
-                    sizeMb = 32,
-                    installed = "assistant-local" in installedModelPackIds,
-                    premium = false
+                    id = assistantQwenPack.id,
+                    title = assistantQwenPack.title,
+                    description = assistantQwenPack.description,
+                    sizeMb = assistantQwenPack.sizeMb,
+                    installed = llmRecord?.installed == true,
+                    premium = assistantQwenPack.premium,
+                    installStatus = llmRecord?.installStatus ?: ModelPackInstallStatus.NotInstalled,
+                    progressPercent = llmRecord?.progressPercent ?: 0,
+                    errorMessage = llmRecord?.errorMessage,
+                    runtimeLabel = assistantQwenPack.runtimeLabel
                 )
             )
         }
@@ -88,11 +110,21 @@ object ResourcePackageRepository {
 
     suspend fun installModelPack(context: Context, packId: String) {
         if (packId == "translate-core") return
+        if (packId == assistantQwenPack.id) {
+            enqueuePrimaryAssistantPackDownload(context)
+            return
+        }
         ModelPackStore.setInstalled(context, packId, installed = true)
     }
 
     suspend fun removeModelPack(context: Context, packId: String) {
         if (packId == "translate-core") return
+        if (packId == assistantQwenPack.id) {
+            val localPath = ModelPackStore.getRecord(context, packId)?.localPath
+            localPath?.let { path ->
+                runCatching { File(path).delete() }
+            }
+        }
         ModelPackStore.setInstalled(context, packId, installed = false)
     }
 
@@ -126,7 +158,8 @@ object ResourcePackageRepository {
         val cityMb = assetSizeMb(context, "gems_pois_en.json") + assetSizeMb(context, "gems_pois_zh.json")
         val cacheMb = dirSizeMb(context.cacheDir)
         val dbMb = dbSizeMb(context, "tran_tools.db")
-        val modelMb = cacheMb + dbMb
+        val modelPackMb = dirSizeMb(modelPackDir(context))
+        val modelMb = cacheMb + dbMb + modelPackMb
         return StorageSummary(
             usedMb = wikiMb + cityMb + modelMb,
             modelMb = modelMb,
@@ -161,4 +194,40 @@ object ResourcePackageRepository {
         }.getOrDefault(0L)
         return (total / 1024f / 1024f).toInt().coerceAtLeast(0)
     }
+
+    suspend fun getReadyModelPath(
+        context: Context,
+        packId: String = assistantQwenPack.id,
+    ): String? {
+        val record = ModelPackStore.getRecord(context, packId) ?: return null
+        val localPath = record.localPath ?: return null
+        return localPath.takeIf {
+            File(it).exists() && record.installStatus == ModelPackInstallStatus.Ready
+        }
+    }
+
+    private suspend fun enqueuePrimaryAssistantPackDownload(context: Context) {
+        ModelPackStore.setDownloading(context, assistantQwenPack.id, progressPercent = 1)
+        ModelPackDownloadWorker.enqueue(
+            context = context,
+            packId = assistantQwenPack.id,
+            fileName = assistantQwenPack.fileName,
+            downloadUrl = assistantQwenPack.downloadUrl
+        )
+    }
+
+    private fun modelPackDir(context: Context): File {
+        return File(context.filesDir, "model-packs")
+    }
+
+    private val assistantQwenPack = DownloadableModelPackDefinition(
+        id = "qwen2.5-1.5b-instruct-q8",
+        title = "Qwen2.5 1.5B Instruct",
+        description = "On-device multilingual assistant model tuned for grounded travel answers",
+        sizeMb = 1600,
+        premium = true,
+        fileName = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.task",
+        downloadUrl = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.task",
+        runtimeLabel = "MediaPipe LLM"
+    )
 }

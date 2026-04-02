@@ -18,7 +18,10 @@ object ChatStore {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "tran_tools.db"
-            ).addMigrations(AppDatabase.MIGRATION_1_2)
+            ).addMigrations(
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3
+            )
                 .build()
             initialized = true
         }

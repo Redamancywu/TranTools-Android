@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.neil.trantools.core.ui.R
 import com.neil.trantools.data.settings.CityPackInfo
 import com.neil.trantools.data.settings.ModelPackInfo
+import com.neil.trantools.data.settings.ModelPackInstallStatus
 import com.neil.trantools.data.settings.StorageSummary
 import com.neil.trantools.data.translation.TranslationPackStatus
 import com.neil.trantools.feature.translate.TranslateLanguageOption
@@ -352,12 +353,41 @@ private fun ModelPackRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
+            pack.runtimeLabel?.let { runtime ->
+                Text(
+                    text = runtime,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             if (pack.premium) {
                 Text(
                     text = stringResource(R.string.settings_pack_pro_only),
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold
+                )
+            }
+            Text(
+                text = when (pack.installStatus) {
+                    ModelPackInstallStatus.NotInstalled -> stringResource(R.string.settings_pack_not_installed)
+                    ModelPackInstallStatus.Downloading -> stringResource(R.string.settings_pack_progress, pack.progressPercent)
+                    ModelPackInstallStatus.Ready -> stringResource(R.string.settings_pack_installed)
+                    ModelPackInstallStatus.Failed -> stringResource(R.string.settings_pack_failed)
+                },
+                color = if (pack.installStatus == ModelPackInstallStatus.Failed) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+            pack.errorMessage?.takeIf { it.isNotBlank() }?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }
@@ -370,6 +400,10 @@ private fun ModelPackRow(
                 },
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        } else if (pack.installStatus == ModelPackInstallStatus.Downloading) {
+            OutlinedButton(onClick = {}, enabled = false) {
+                Text(stringResource(R.string.settings_pack_progress, pack.progressPercent))
+            }
         } else if (pack.installed) {
             OutlinedButton(onClick = onRemove) {
                 Text(stringResource(R.string.action_remove))

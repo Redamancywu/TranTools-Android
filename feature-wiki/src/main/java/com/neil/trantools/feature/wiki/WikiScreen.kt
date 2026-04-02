@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.neil.trantools.core.ui.R
 import com.neil.trantools.data.wiki.WikiArticle
 import com.neil.trantools.data.wiki.WikiCategory
+import com.neil.trantools.data.wiki.WikiAnswerSource
 import com.neil.trantools.data.wiki.WikiRepository
 import com.neil.trantools.ui.components.VoyagerTopBar
 import com.neil.trantools.ui.theme.TranToolsTheme
@@ -254,9 +255,7 @@ fun WikiScreen(
             LocalAnswerCard(
                 question = uiState.question,
                 answer = uiState.answer?.answer,
-                sourceArticles = uiState.answer?.sourceIds.orEmpty().mapNotNull { id ->
-                    WikiRepository.findById(uiState.allArticles, id)
-                },
+                sources = uiState.answer?.sources.orEmpty(),
                 suggestedQuestions = uiState.answer?.suggestedQuestions.orEmpty(),
                 onQuestionChange = onQuestionChange,
                 onAskQuestion = onAskQuestion,
@@ -524,7 +523,7 @@ private fun FeaturedFactCard(
 private fun LocalAnswerCard(
     question: String,
     answer: String?,
-    sourceArticles: List<WikiArticle>,
+    sources: List<WikiAnswerSource>,
     suggestedQuestions: List<String>,
     onQuestionChange: (String) -> Unit,
     onAskQuestion: () -> Unit,
@@ -593,22 +592,37 @@ private fun LocalAnswerCard(
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )
-                if (sourceArticles.isNotEmpty()) {
+                if (sources.isNotEmpty()) {
                     Text(
                         text = stringResource(R.string.wiki_qa_sources),
                         fontWeight = FontWeight.Bold
                     )
-                    sourceArticles.forEach { article ->
-                        Row(
+                    sources.forEach { source ->
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onOpenArticle(article.id) }
                                 .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            onClick = { onOpenArticle(source.articleId) },
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainerLowest)
                         ) {
-                            Icon(Icons.Outlined.AutoStories, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(8.dp))
-                            Text(article.title, color = MaterialTheme.colorScheme.primary)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Outlined.AutoStories, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(source.title, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        text = source.excerpt,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
                         }
                     }
                 }
