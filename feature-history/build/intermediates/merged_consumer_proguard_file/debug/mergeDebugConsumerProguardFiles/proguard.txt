@@ -1,2 +1,0 @@
--keep,allowobfuscation,allowshrinking class com.neil.trantools.feature.history.HistoryViewModel
--keep,allowobfuscation,allowshrinking class com.neil.trantools.feature.history.HistoryViewModel

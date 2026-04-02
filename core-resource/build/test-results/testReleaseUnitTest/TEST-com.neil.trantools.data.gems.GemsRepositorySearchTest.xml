@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.neil.trantools.data.gems.GemsRepositorySearchTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-01T07:38:48.429Z" hostname="neilwudeMBP.gw.gcableconfig.local" time="0.01">
-  <properties/>
-  <testcase name="search filters by category and sorts by distance" classname="com.neil.trantools.data.gems.GemsRepositorySearchTest" time="0.01"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
