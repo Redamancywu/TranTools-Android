@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.speech.tts.TextToSpeech
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Restaurant
@@ -91,6 +93,7 @@ import com.neil.trantools.data.translation.matches
 import com.neil.trantools.ui.components.VoyagerTopBar
 import com.neil.trantools.ui.theme.TranToolsTheme
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 @Composable
 fun TranslateRoute(
@@ -112,6 +115,8 @@ fun TranslateRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val translationPackStatuses by remember { TranslationModelStore.observeStatuses() }
         .collectAsStateWithLifecycle()
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var ttsReady by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -145,6 +150,17 @@ fun TranslateRoute(
         onPrefillConsumed()
     }
 
+    DisposableEffect(context) {
+        val textToSpeech = TextToSpeech(context) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+        }
+        tts = textToSpeech
+        onDispose {
+            tts?.stop()
+            tts?.shutdown()
+        }
+    }
+
     val effectiveSourceLanguage = if (uiState.inputMode == TranslateInputMode.Text) {
         uiState.effectiveTextSourceLanguage()
     } else {
@@ -174,6 +190,14 @@ fun TranslateRoute(
         onSelectInputMode = viewModel::setInputMode,
         onTextInputChange = viewModel::setTextInput,
         onTranslateText = viewModel::translateText,
+        onSpeakTextTranslation = {
+            val translated = uiState.textTranslation.trim()
+            if (translated.isBlank()) return@TranslateScreen
+            val targetLocale = localeForLanguage(uiState.targetLanguage)
+            tts?.language = targetLocale
+            tts?.speak(translated, TextToSpeech.QUEUE_FLUSH, null, "translate_text_tts")
+        },
+        isTextSpeechReady = ttsReady,
         onRequestCameraPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
         onClearResult = viewModel::clearRecognizedResult,
         onClearText = viewModel::clearTextResult,
@@ -243,6 +267,8 @@ fun TranslateScreen(
     onSelectInputMode: (TranslateInputMode) -> Unit,
     onTextInputChange: (String) -> Unit,
     onTranslateText: () -> Unit,
+    onSpeakTextTranslation: () -> Unit,
+    isTextSpeechReady: Boolean,
     onRequestCameraPermission: () -> Unit,
     onClearResult: () -> Unit,
     onClearText: () -> Unit,
@@ -307,6 +333,8 @@ fun TranslateScreen(
                         targetPackStatus = targetPackStatus,
                         onTextInputChange = onTextInputChange,
                         onTranslateText = onTranslateText,
+                        onSpeakTextTranslation = onSpeakTextTranslation,
+                        isTextSpeechReady = isTextSpeechReady,
                         onClearText = onClearText,
                         onToggleFavoritePhrase = onToggleFavoritePhrase,
                         onApplyPhrase = onApplyPhrase,
@@ -471,6 +499,8 @@ private fun TextTranslatePane(
     targetPackStatus: TranslationPackStatus?,
     onTextInputChange: (String) -> Unit,
     onTranslateText: () -> Unit,
+    onSpeakTextTranslation: () -> Unit,
+    isTextSpeechReady: Boolean,
     onClearText: () -> Unit,
     onToggleFavoritePhrase: () -> Unit,
     onApplyPhrase: (FavoritePhrase) -> Unit,
@@ -641,6 +671,13 @@ private fun TextTranslatePane(
                             Icon(Icons.Outlined.ContentCopy, contentDescription = null)
                             Text(stringResource(R.string.action_copy), modifier = Modifier.padding(start = 4.dp))
                         }
+                        TextButton(
+                            onClick = onSpeakTextTranslation,
+                            enabled = uiState.textTranslation.isNotBlank() && isTextSpeechReady
+                        ) {
+                            Icon(Icons.Outlined.GraphicEq, contentDescription = null)
+                            Text(stringResource(R.string.action_speak), modifier = Modifier.padding(start = 4.dp))
+                        }
                     }
 
                     if (uiState.textTranslation.isBlank()) {
@@ -690,6 +727,17 @@ private fun TextTranslatePane(
                 }
             }
         }
+    }
+}
+
+private fun localeForLanguage(language: TranslateLanguageOption): Locale {
+    return when (language) {
+        TranslateLanguageOption.Auto -> Locale.getDefault()
+        TranslateLanguageOption.English -> Locale.ENGLISH
+        TranslateLanguageOption.Japanese -> Locale.JAPANESE
+        TranslateLanguageOption.Chinese -> Locale.SIMPLIFIED_CHINESE
+        TranslateLanguageOption.Korean -> Locale.KOREAN
+        TranslateLanguageOption.Spanish -> Locale.forLanguageTag("es-ES")
     }
 }
 
@@ -1183,6 +1231,8 @@ private fun TranslateScreenPreviewText() {
             onSelectInputMode = {},
             onTextInputChange = {},
             onTranslateText = {},
+            onSpeakTextTranslation = {},
+            isTextSpeechReady = true,
             onRequestCameraPermission = {},
             onClearResult = {},
             onClearText = {},
@@ -1218,6 +1268,8 @@ private fun TranslateScreenPreviewCamera() {
             onSelectInputMode = {},
             onTextInputChange = {},
             onTranslateText = {},
+            onSpeakTextTranslation = {},
+            isTextSpeechReady = true,
             onRequestCameraPermission = {},
             onClearResult = {},
             onClearText = {},

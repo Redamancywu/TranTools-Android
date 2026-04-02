@@ -52,6 +52,7 @@
     <string name="action_manage_subscription">Manage Subscription</string>
     <string name="action_translate">Translate</string>
     <string name="action_copy">Copy</string>
+    <string name="action_speak">Speak</string>
     <string name="action_launch">Launch</string>
     <string name="action_filter">Filter</string>
     <string name="action_grant_camera">Grant Camera Access</string>
