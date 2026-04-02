@@ -1,0 +1,177 @@
+package com.neil.trantools.feature.chat
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.neil.trantools.core.ui.R
+import com.neil.trantools.data.chat.ChatMessageEntity
+import com.neil.trantools.data.chat.ChatSource
+import com.neil.trantools.data.chat.ChatSourceType
+import com.neil.trantools.data.chat.ChatStore
+import com.neil.trantools.data.gems.GemsRepository
+import com.neil.trantools.data.history.HistoryStore
+import com.neil.trantools.data.wiki.WikiRepository
+import com.neil.trantools.domain.chat.BuildLocalAssistantResponseUseCase
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicLong
+import javax.inject.Inject
+
+@HiltViewModel
+class ChatViewModel @Inject constructor(
+    application: Application,
+) : AndroidViewModel(application) {
+    private val appContext = getApplication<Application>().applicationContext
+    private val messageId = AtomicLong(1L)
+    private val buildAssistantResponse = BuildLocalAssistantResponseUseCase(
+        wikiProvider = { WikiRepository.loadArticles(appContext) },
+        gemsProvider = { GemsRepository.loadPois(appContext) },
+        historyProvider = { limit -> HistoryStore.getRecent(limit) },
+        fallbackAnswer = appContext.getString(R.string.chat_no_match),
+        translateHistoryLabel = appContext.getString(R.string.chat_history_translate),
+        photoHistoryLabel = appContext.getString(R.string.chat_history_photo),
+        voiceHistoryLabel = appContext.getString(R.string.chat_history_voice)
+    )
+    private val _uiState = MutableStateFlow(ChatUiState())
+    val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            loadPersistedMessages()
+        }
+    }
+
+    private suspend fun loadPersistedMessages() {
+        val entities = withContext(Dispatchers.IO) { ChatStore.getAll() }
+        if (entities.isEmpty()) {
+            _uiState.value = ChatUiState(
+                messages = listOf(
+                    ChatMessage(
+                        id = messageId.getAndIncrement(),
+                        role = ChatRole.Assistant,
+                        text = appContext.getString(R.string.chat_welcome)
+                    )
+                )
+            )
+            return
+        }
+        val messages = entities.map { it.toChatMessage() }
+        val maxId = entities.maxOf { it.id }
+        messageId.set(maxId + 1)
+        _uiState.value = ChatUiState(messages = messages)
+    }
+
+    fun setInput(value: String) {
+        _uiState.value = _uiState.value.copy(input = value)
+    }
+
+    fun applyPrefillQuestion(question: String) {
+        _uiState.value = _uiState.value.copy(input = question)
+        sendMessage(question)
+    }
+
+    fun sendCurrentInput() {
+        sendMessage(_uiState.value.input)
+    }
+
+    private fun sendMessage(raw: String) {
+        val question = raw.trim()
+        if (question.isEmpty() || _uiState.value.isThinking) return
+
+        val currentMessages = _uiState.value.messages
+        val userMessage = ChatMessage(
+            id = messageId.getAndIncrement(),
+            role = ChatRole.User,
+            text = question
+        )
+        _uiState.value = _uiState.value.copy(
+            input = "",
+            messages = currentMessages + userMessage,
+            isThinking = true
+        )
+        persistMessage(userMessage)
+
+        viewModelScope.launch {
+            val answer = withContext(Dispatchers.IO) {
+                buildAssistantResponse(
+                    question = question,
+                    previousUserTurns = currentMessages.filter { it.role == ChatRole.User }.map { it.text }
+                )
+            }
+
+            val assistantMessage = ChatMessage(
+                id = messageId.getAndIncrement(),
+                role = ChatRole.Assistant,
+                text = answer.answer,
+                sources = answer.sources
+            )
+
+            _uiState.value = _uiState.value.copy(
+                messages = _uiState.value.messages + assistantMessage,
+                isThinking = false
+            )
+            persistMessage(assistantMessage)
+        }
+    }
+
+    private fun persistMessage(message: ChatMessage) {
+        viewModelScope.launch(Dispatchers.IO) {
+            ChatStore.insert(
+                ChatMessageEntity(
+                    id = message.id,
+                    role = message.role.name,
+                    text = message.text,
+                    sourcesJson = serializeSources(message.sources),
+                    createdAtEpochMs = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+}
+
+private fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
+    id = id,
+    role = runCatching { ChatRole.valueOf(role) }.getOrDefault(ChatRole.Assistant),
+    text = text,
+    sources = deserializeSources(sourcesJson)
+)
+
+private fun serializeSources(sources: List<ChatSource>): String {
+    val array = JSONArray()
+    sources.forEach { source ->
+        val obj = JSONObject().apply {
+            put("id", source.id)
+            put("title", source.title)
+            put("subtitle", source.subtitle)
+            put("type", source.type.name)
+        }
+        array.put(obj)
+    }
+    return array.toString()
+}
+
+private fun deserializeSources(json: String): List<ChatSource> {
+    if (json.isBlank() || json == "[]") return emptyList()
+    return runCatching {
+        val array = JSONArray(json)
+        (0 until array.length()).mapNotNull { i ->
+            runCatching {
+                val obj = array.getJSONObject(i)
+                ChatSource(
+                    id = obj.getString("id"),
+                    title = obj.getString("title"),
+                    subtitle = obj.getString("subtitle"),
+                    type = runCatching { ChatSourceType.valueOf(obj.getString("type")) }
+                        .getOrDefault(ChatSourceType.Wiki)
+                )
+            }.getOrNull()
+        }
+    }.getOrDefault(emptyList())
+}

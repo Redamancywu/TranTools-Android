@@ -1,0 +1,2 @@
+-keep,allowobfuscation,allowshrinking class com.neil.trantools.feature.translate.TranslateViewModel
+-keep,allowobfuscation,allowshrinking class com.neil.trantools.feature.translate.TranslateViewModel

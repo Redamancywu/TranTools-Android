@@ -1,0 +1,2 @@
+-keep,allowobfuscation,allowshrinking class com.neil.trantools.feature.wiki.WikiViewModel
+-keep,allowobfuscation,allowshrinking class com.neil.trantools.feature.wiki.WikiViewModel

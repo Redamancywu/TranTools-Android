@@ -1,0 +1,114 @@
+[
+  {
+    "id": "taj-mahal",
+    "title": "The Taj Mahal",
+    "place": "Agra, India",
+    "category": "Architecture",
+    "summary": "An ivory-white marble mausoleum built by Shah Jahan in memory of Mumtaz Mahal.",
+    "fact": "Its marble changes tone with the light, often looking pink at sunrise and golden at dusk.",
+    "content": [
+      "The Taj Mahal is one of the best-known examples of Mughal architecture and was commissioned in the 17th century.",
+      "Its design combines Persian garden planning, monumental symmetry, and intricate stone inlay work.",
+      "Travelers often discover that the site feels more ceremonial and calm than its postcard image suggests."
+    ],
+    "tags": ["Heritage", "Mughal", "Marble", "Landmark"]
+  },
+  {
+    "id": "colosseum",
+    "title": "The Colosseum",
+    "place": "Rome, Italy",
+    "category": "History",
+    "summary": "The largest ancient amphitheatre ever built, once used for public spectacles in imperial Rome.",
+    "fact": "Its circulation system could move large crowds surprisingly efficiently even by modern standards.",
+    "content": [
+      "Construction began under Emperor Vespasian and the amphitheatre opened in AD 80.",
+      "It hosted gladiatorial combats, public entertainments, and symbolic displays of imperial power.",
+      "Even in ruin, the building still demonstrates advanced planning for visibility, access, and crowd control."
+    ],
+    "tags": ["Ancient Rome", "Arena", "Empire", "Stone"]
+  },
+  {
+    "id": "venice-canals",
+    "title": "Venice Canals",
+    "place": "Venice, Italy",
+    "category": "Culture",
+    "summary": "Venice developed on lagoon islands linked by bridges and navigated by canals.",
+    "fact": "The city has more than 400 bridges connecting neighborhoods across the lagoon settlement.",
+    "content": [
+      "Venice adapted urban life to water rather than replacing it with conventional streets.",
+      "Canals historically worked as the city’s transport network for trade, movement, and daily logistics.",
+      "Its cultural identity is closely tied to maritime trade, craftsmanship, and civic ritual."
+    ],
+    "tags": ["Lagoon", "Bridges", "Maritime", "Urban Culture"]
+  },
+  {
+    "id": "ramen-basics",
+    "title": "Ramen Basics",
+    "place": "Japan",
+    "category": "Food",
+    "summary": "Ramen combines broth, noodles, tare seasoning, and toppings into a highly regional dish.",
+    "fact": "Broth and tare are layered separately, which is why ramen shops can taste very different.",
+    "content": [
+      "Common ramen styles include shoyu, shio, miso, and tonkotsu, but real menus often mix traditions.",
+      "A useful travel shortcut is to identify the broth style first before comparing toppings.",
+      "Regional ramen differences can reflect local ingredients, weather, and dining habits."
+    ],
+    "tags": ["Menu Help", "Noodles", "Broth", "Regional Food"]
+  },
+  {
+    "id": "hanok-houses",
+    "title": "Hanok Houses",
+    "place": "Korea",
+    "category": "Architecture",
+    "summary": "Hanok refers to traditional Korean houses organized around climate, courtyards, and timber structure.",
+    "fact": "Their layout often balances sunlight, airflow, and privacy through courtyard orientation.",
+    "content": [
+      "Hanok architecture uses materials such as timber, stone, clay, and paper to create a softer interior atmosphere.",
+      "Many restored hanok neighborhoods now mix residential life with tea houses, guesthouses, and workshops.",
+      "They show how domestic architecture can reflect both social customs and seasonal climate."
+    ],
+    "tags": ["Traditional House", "Wood", "Courtyard", "Korea"]
+  },
+  {
+    "id": "tapas-culture",
+    "title": "Tapas Culture",
+    "place": "Spain",
+    "category": "Food",
+    "summary": "Tapas are small dishes designed for sharing and social dining across neighborhood bars.",
+    "fact": "In many cities, tapas culture is about moving between several bars rather than staying in one place.",
+    "content": [
+      "Tapas vary by region and can include seafood, cured meats, vegetables, breads, and slow-cooked dishes.",
+      "The experience is often conversational and mobile, with people sampling a few dishes at each stop.",
+      "For travelers, it helps to treat the evening as a sequence of short rounds instead of one large meal."
+    ],
+    "tags": ["Dining", "Sharing", "Spain", "Bar Culture"]
+  },
+  {
+    "id": "onsen-etiquette",
+    "title": "Onsen Etiquette",
+    "place": "Japan",
+    "category": "Culture",
+    "summary": "Onsen culture centers on bathing etiquette, quiet behavior, and shared respect for the space.",
+    "fact": "You are generally expected to wash thoroughly before entering the hot bath itself.",
+    "content": [
+      "Onsen etiquette emphasizes cleanliness, calm movement, and low voices in shared spaces.",
+      "Rules can vary by facility, especially around towels, photography, tattoos, and private baths.",
+      "Understanding the etiquette in advance reduces stress and makes the experience more enjoyable."
+    ],
+    "tags": ["Bathing", "Etiquette", "Japan", "Travel Tips"]
+  },
+  {
+    "id": "siheyuan-courtyard",
+    "title": "Siheyuan Courtyard Houses",
+    "place": "Beijing, China",
+    "category": "Architecture",
+    "summary": "Siheyuan are traditional courtyard compounds that organize rooms around a central open space.",
+    "fact": "The courtyard was both a social core and a strategy for light, air, and family hierarchy.",
+    "content": [
+      "Siheyuan layouts often reflected social order, with room placement signaling age and status.",
+      "Courtyard houses also moderated climate by creating semi-sheltered outdoor space inside dense neighborhoods.",
+      "Many surviving compounds provide a useful lens into older patterns of domestic life in northern China."
+    ],
+    "tags": ["Courtyard", "China", "Domestic Architecture", "Beijing"]
+  }
+]

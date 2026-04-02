@@ -1,0 +1,74 @@
+[
+  {
+    "id": "kiyomizu-dera",
+    "title": "清水寺",
+    "category": "Culture",
+    "summary": "位于山坡上的大型寺院群，以木制清水舞台和京都市景闻名。",
+    "tip": "建议清晨前往，避开通往寺院路上的高峰人流。",
+    "address": "京都市东山区清水 1 丁目 294",
+    "latitude": 34.9949,
+    "longitude": 135.7850,
+    "rating": 4.8,
+    "tags": ["寺院", "世界遗产", "历史"]
+  },
+  {
+    "id": "nishiki-market",
+    "title": "锦市场",
+    "category": "Food",
+    "summary": "可集中体验京都小吃、腌菜、甜点与地方风味的室内市场。",
+    "tip": "最好边走边少量分享购买，这样能尝到更多摊位。",
+    "address": "京都市中京区",
+    "latitude": 35.0050,
+    "longitude": 135.7644,
+    "rating": 4.6,
+    "tags": ["市场", "街头美食", "购物"]
+  },
+  {
+    "id": "arashiyama-bamboo",
+    "title": "岚山竹林",
+    "category": "Nature",
+    "summary": "京都最具代表性的竹林步道之一，适合散步与拍照。",
+    "tip": "日出后不久的氛围最好，游客也相对较少。",
+    "address": "京都市右京区",
+    "latitude": 35.0170,
+    "longitude": 135.6713,
+    "rating": 4.7,
+    "tags": ["自然", "步行", "拍照"]
+  },
+  {
+    "id": "fushimi-inari",
+    "title": "伏见稻荷大社",
+    "category": "Viewpoint",
+    "summary": "以成千上万座朱红色鸟居组成的山路闻名。",
+    "tip": "继续走过第一个观景点后，人会少很多，体验更完整。",
+    "address": "京都市伏见区深草薮之内町 68",
+    "latitude": 34.9671,
+    "longitude": 135.7727,
+    "rating": 4.9,
+    "tags": ["神社", "徒步", "鸟居"]
+  },
+  {
+    "id": "gion-shirakawa",
+    "title": "祇园白川",
+    "category": "Culture",
+    "summary": "沿运河保留较完整的传统街区，有茶屋、灯笼与夜晚氛围。",
+    "tip": "傍晚最适合散步，水面反光与木质立面层次更明显。",
+    "address": "京都市东山区祇园",
+    "latitude": 35.0037,
+    "longitude": 135.7763,
+    "rating": 4.7,
+    "tags": ["运河", "老街", "夜景散步"]
+  },
+  {
+    "id": "kinkaku-ji",
+    "title": "金阁寺",
+    "category": "Viewpoint",
+    "summary": "金色楼阁与池面倒影组成了京都最经典的景观之一。",
+    "tip": "多云天气往往比正午烈日更适合拍到干净的水面反射。",
+    "address": "京都市北区金阁寺町 1",
+    "latitude": 35.0394,
+    "longitude": 135.7292,
+    "rating": 4.7,
+    "tags": ["寺院", "倒影", "景观"]
+  }
+]

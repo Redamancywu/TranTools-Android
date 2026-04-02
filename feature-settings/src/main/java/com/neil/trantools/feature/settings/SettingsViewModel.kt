@@ -1,0 +1,108 @@
+package com.neil.trantools.feature.settings
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.neil.trantools.core.resource.ThemeStyleStore
+import com.neil.trantools.data.settings.BehaviorPreferencesStore
+import com.neil.trantools.data.settings.LocalSubscriptionState
+import com.neil.trantools.data.settings.ResourcePackageRepository
+import com.neil.trantools.data.settings.SubscriptionStore
+import com.neil.trantools.data.translation.TranslationModelStore
+import com.neil.trantools.ui.theme.AppThemeStyle
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.io.File
+import javax.inject.Inject
+
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    application: Application,
+) : AndroidViewModel(application) {
+    private val appContext = getApplication<Application>().applicationContext
+    private val _uiState = MutableStateFlow(SettingsUiState())
+    val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            ThemeStyleStore.observe(appContext).collect { style ->
+                _uiState.value = _uiState.value.copy(themeStyle = style)
+            }
+        }
+        viewModelScope.launch {
+            SubscriptionStore.observe(appContext).collect { state ->
+                _uiState.value = _uiState.value.copy(subscriptionState = state)
+            }
+        }
+        viewModelScope.launch {
+            TranslationModelStore.observeStatuses().collect { statuses ->
+                _uiState.value = _uiState.value.copy(translationPackStatuses = statuses)
+            }
+        }
+        viewModelScope.launch {
+            BehaviorPreferencesStore.observeOfflineOnly(appContext).collect { value ->
+                _uiState.value = _uiState.value.copy(offlineOnlyMode = value)
+            }
+        }
+        viewModelScope.launch {
+            BehaviorPreferencesStore.observeAutoDownloadWifi(appContext).collect { value ->
+                _uiState.value = _uiState.value.copy(autoDownloadOnWifi = value)
+            }
+        }
+        viewModelScope.launch {
+            BehaviorPreferencesStore.observeHighQualityOcr(appContext).collect { value ->
+                _uiState.value = _uiState.value.copy(highQualityOcr = value)
+            }
+        }
+        refreshResources()
+    }
+
+    fun refreshResources() {
+        viewModelScope.launch {
+            TranslationModelStore.refresh()
+            val modelPacks = ResourcePackageRepository.observeModelPacks(appContext)
+            modelPacks.collect { packs ->
+                _uiState.value = _uiState.value.copy(
+                    modelPacks = packs,
+                    cityPacks = ResourcePackageRepository.loadCityPacks(appContext),
+                    storageSummary = ResourcePackageRepository.buildStorageSummary(appContext)
+                )
+            }
+        }
+    }
+
+    fun setThemeStyle(style: AppThemeStyle) {
+        viewModelScope.launch {
+            ThemeStyleStore.set(appContext, style)
+        }
+    }
+
+    fun setSubscriptionState(state: LocalSubscriptionState) {
+        viewModelScope.launch {
+            SubscriptionStore.set(appContext, state)
+        }
+    }
+
+    fun setOfflineOnlyMode(value: Boolean) {
+        viewModelScope.launch { BehaviorPreferencesStore.setOfflineOnly(appContext, value) }
+    }
+
+    fun setAutoDownloadOnWifi(value: Boolean) {
+        viewModelScope.launch { BehaviorPreferencesStore.setAutoDownloadWifi(appContext, value) }
+    }
+
+    fun setHighQualityOcr(value: Boolean) {
+        viewModelScope.launch { BehaviorPreferencesStore.setHighQualityOcr(appContext, value) }
+    }
+
+    fun clearCache() {
+        viewModelScope.launch(Dispatchers.IO) {
+            appContext.cacheDir.deleteRecursively()
+            appContext.cacheDir.mkdirs()
+        }
+    }
+}

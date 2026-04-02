@@ -1,0 +1,74 @@
+[
+  {
+    "id": "kiyomizu-dera",
+    "title": "Kiyomizu-dera",
+    "category": "Culture",
+    "summary": "A hillside temple complex known for its wooden stage and city views.",
+    "tip": "Arrive early to avoid the densest crowds on the approach streets.",
+    "address": "1 Chome-294 Kiyomizu, Higashiyama Ward, Kyoto",
+    "latitude": 34.9949,
+    "longitude": 135.7850,
+    "rating": 4.8,
+    "tags": ["Temple", "UNESCO", "Historic"]
+  },
+  {
+    "id": "nishiki-market",
+    "title": "Nishiki Market",
+    "category": "Food",
+    "summary": "A lively covered market for snacks, sweets, pickles, and Kyoto specialties.",
+    "tip": "Go with a short list and share bites so you can sample more stalls.",
+    "address": "Nakagyo Ward, Kyoto",
+    "latitude": 35.0050,
+    "longitude": 135.7644,
+    "rating": 4.6,
+    "tags": ["Market", "Street Food", "Shopping"]
+  },
+  {
+    "id": "arashiyama-bamboo",
+    "title": "Arashiyama Bamboo Grove",
+    "category": "Nature",
+    "summary": "A dense bamboo path with one of Kyoto’s most iconic walking experiences.",
+    "tip": "The grove feels most atmospheric just after sunrise before tour groups arrive.",
+    "address": "Ukyo Ward, Kyoto",
+    "latitude": 35.0170,
+    "longitude": 135.6713,
+    "rating": 4.7,
+    "tags": ["Nature", "Walk", "Photo Spot"]
+  },
+  {
+    "id": "fushimi-inari",
+    "title": "Fushimi Inari Taisha",
+    "category": "Viewpoint",
+    "summary": "A mountainside shrine route lined with thousands of vermilion torii gates.",
+    "tip": "If you continue beyond the first viewpoint, the path becomes quieter and more rewarding.",
+    "address": "68 Fukakusa Yabunouchicho, Fushimi Ward, Kyoto",
+    "latitude": 34.9671,
+    "longitude": 135.7727,
+    "rating": 4.9,
+    "tags": ["Shrine", "Hike", "Torii"]
+  },
+  {
+    "id": "gion-shirakawa",
+    "title": "Gion Shirakawa",
+    "category": "Culture",
+    "summary": "A preserved canal-side district with teahouses, lanterns, and evening atmosphere.",
+    "tip": "Visit at dusk for the strongest contrast between water reflections and wooden facades.",
+    "address": "Gion, Higashiyama Ward, Kyoto",
+    "latitude": 35.0037,
+    "longitude": 135.7763,
+    "rating": 4.7,
+    "tags": ["Canal", "Historic Street", "Evening Walk"]
+  },
+  {
+    "id": "kinkaku-ji",
+    "title": "Kinkaku-ji",
+    "category": "Viewpoint",
+    "summary": "The Golden Pavilion reflected in a pond, one of Kyoto’s most recognizable scenes.",
+    "tip": "Cloudy days often produce cleaner water reflections than harsh midday sun.",
+    "address": "1 Kinkakujicho, Kita Ward, Kyoto",
+    "latitude": 35.0394,
+    "longitude": 135.7292,
+    "rating": 4.7,
+    "tags": ["Temple", "Reflection", "Scenic"]
+  }
+]

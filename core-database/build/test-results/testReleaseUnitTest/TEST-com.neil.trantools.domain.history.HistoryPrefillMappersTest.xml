@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.neil.trantools.domain.history.HistoryPrefillMappersTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-04-01T07:38:50.045Z" hostname="neilwudeMBP.gw.gcableconfig.local" time="0.035">
+  <properties/>
+  <testcase name="map text history into text prefill" classname="com.neil.trantools.domain.history.HistoryPrefillMappersTest" time="0.021"/>
+  <testcase name="map voice history into voice prefill" classname="com.neil.trantools.domain.history.HistoryPrefillMappersTest" time="0.001"/>
+  <testcase name="ignore voice item for translate prefill" classname="com.neil.trantools.domain.history.HistoryPrefillMappersTest" time="0.0"/>
+  <testcase name="map ocr history into camera prefill" classname="com.neil.trantools.domain.history.HistoryPrefillMappersTest" time="0.012"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
