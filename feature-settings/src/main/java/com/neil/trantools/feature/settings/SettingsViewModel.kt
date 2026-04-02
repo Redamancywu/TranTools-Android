@@ -44,6 +44,22 @@ class SettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            ResourcePackageRepository.observeModelPacks(appContext).collect { packs ->
+                _uiState.value = _uiState.value.copy(
+                    modelPacks = packs,
+                    storageSummary = ResourcePackageRepository.buildStorageSummary(appContext)
+                )
+            }
+        }
+        viewModelScope.launch {
+            ResourcePackageRepository.observeCityPacks(appContext).collect { packs ->
+                _uiState.value = _uiState.value.copy(
+                    cityPacks = packs,
+                    storageSummary = ResourcePackageRepository.buildStorageSummary(appContext)
+                )
+            }
+        }
+        viewModelScope.launch {
             BehaviorPreferencesStore.observeOfflineOnly(appContext).collect { value ->
                 _uiState.value = _uiState.value.copy(offlineOnlyMode = value)
             }
@@ -64,14 +80,9 @@ class SettingsViewModel @Inject constructor(
     fun refreshResources() {
         viewModelScope.launch {
             TranslationModelStore.refresh()
-            val modelPacks = ResourcePackageRepository.observeModelPacks(appContext)
-            modelPacks.collect { packs ->
-                _uiState.value = _uiState.value.copy(
-                    modelPacks = packs,
-                    cityPacks = ResourcePackageRepository.loadCityPacks(appContext),
-                    storageSummary = ResourcePackageRepository.buildStorageSummary(appContext)
-                )
-            }
+            _uiState.value = _uiState.value.copy(
+                storageSummary = ResourcePackageRepository.buildStorageSummary(appContext)
+            )
         }
     }
 
@@ -97,6 +108,30 @@ class SettingsViewModel @Inject constructor(
 
     fun setHighQualityOcr(value: Boolean) {
         viewModelScope.launch { BehaviorPreferencesStore.setHighQualityOcr(appContext, value) }
+    }
+
+    fun installModelPack(id: String) {
+        viewModelScope.launch {
+            ResourcePackageRepository.installModelPack(appContext, id)
+        }
+    }
+
+    fun removeModelPack(id: String) {
+        viewModelScope.launch {
+            ResourcePackageRepository.removeModelPack(appContext, id)
+        }
+    }
+
+    fun downloadCityPack(id: String) {
+        viewModelScope.launch {
+            ResourcePackageRepository.downloadCityPack(appContext, id)
+        }
+    }
+
+    fun deleteCityPack(id: String) {
+        viewModelScope.launch {
+            ResourcePackageRepository.deleteCityPack(appContext, id)
+        }
     }
 
     fun clearCache() {

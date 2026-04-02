@@ -262,6 +262,8 @@
     <string name="settings_pack_installed">Installed</string>
     <string name="settings_pack_not_installed">Not installed</string>
     <string name="settings_pack_size">Size %1$d MB</string>
+    <string name="settings_pack_pro_only">Pro benefit</string>
+    <string name="settings_pack_poi_count">%1$d POIs included</string>
     <string name="settings_pro_active">Voyager Pro Active</string>
     <string name="settings_upgrade_pro">Upgrade to Voyager Pro</string>
     <string name="settings_pro_desc_active">You have full access to advanced OCR quality and large model packs.</string>

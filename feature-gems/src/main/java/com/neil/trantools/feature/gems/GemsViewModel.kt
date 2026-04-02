@@ -15,6 +15,7 @@ import com.neil.trantools.data.gems.GemPoi
 import com.neil.trantools.data.gems.GeoPoint
 import com.neil.trantools.data.gems.GemsPreferencesStore
 import com.neil.trantools.data.gems.GemsRepository
+import com.neil.trantools.data.settings.ResourcePackageRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -73,6 +74,19 @@ class GemsViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = GemsUiState()
     )
+
+    init {
+        viewModelScope.launch {
+            ResourcePackageRepository.observeCityPacks(appContext).collect { cityPacks ->
+                val kyotoInstalled = cityPacks.any { it.id == "kyoto" && it.installed }
+                allPois.value = if (kyotoInstalled) {
+                    GemsRepository.loadPois(appContext)
+                } else {
+                    emptyList()
+                }
+            }
+        }
+    }
 
     fun setQuery(value: String) {
         query.value = value

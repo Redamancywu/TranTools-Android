@@ -5,7 +5,8 @@ import com.neil.trantools.data.gems.GemsRepository
 import com.neil.trantools.data.translation.TranslationModelStore
 import com.neil.trantools.data.wiki.WikiRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 
 data class ModelPackInfo(
     val id: String,
@@ -33,10 +34,11 @@ data class StorageSummary(
 )
 
 object ResourcePackageRepository {
-    fun observeModelPacks(context: Context): Flow<List<ModelPackInfo>> = flow {
-        TranslationModelStore.refresh()
-        val translationStatuses = TranslationModelStore.observeStatuses().value
-        emit(
+    fun observeModelPacks(context: Context): Flow<List<ModelPackInfo>> {
+        return combine(
+            TranslationModelStore.observeStatuses(),
+            ModelPackStore.observeInstalledIds(context)
+        ) { translationStatuses, installedModelPackIds ->
             listOf(
                 ModelPackInfo(
                     id = "translate-core",
@@ -51,7 +53,7 @@ object ResourcePackageRepository {
                     title = "Advanced OCR",
                     description = "Higher quality menu and sign text extraction",
                     sizeMb = 96,
-                    installed = true,
+                    installed = "ocr-advanced" in installedModelPackIds,
                     premium = true
                 ),
                 ModelPackInfo(
@@ -59,15 +61,46 @@ object ResourcePackageRepository {
                     title = "Local Assistant Orchestrator",
                     description = "Local retrieval and response composition pipeline",
                     sizeMb = 32,
-                    installed = true,
+                    installed = "assistant-local" in installedModelPackIds,
                     premium = false
                 )
             )
-        )
+        }
+    }
+
+    fun observeCityPacks(context: Context): Flow<List<CityPackInfo>> {
+        return CityPackStore.observeInstalledIds(context).map { installedIds ->
+            buildCityPacks(context = context, installedCityPackIds = installedIds)
+        }
     }
 
     fun loadCityPacks(context: Context): List<CityPackInfo> {
-        val pois = GemsRepository.loadPois(context)
+        return buildCityPacks(context = context, installedCityPackIds = setOf("kyoto"))
+    }
+
+    suspend fun downloadCityPack(context: Context, packId: String) {
+        CityPackStore.setInstalled(context, packId, installed = true)
+    }
+
+    suspend fun deleteCityPack(context: Context, packId: String) {
+        CityPackStore.setInstalled(context, packId, installed = false)
+    }
+
+    suspend fun installModelPack(context: Context, packId: String) {
+        if (packId == "translate-core") return
+        ModelPackStore.setInstalled(context, packId, installed = true)
+    }
+
+    suspend fun removeModelPack(context: Context, packId: String) {
+        if (packId == "translate-core") return
+        ModelPackStore.setInstalled(context, packId, installed = false)
+    }
+
+    private fun buildCityPacks(
+        context: Context,
+        installedCityPackIds: Set<String>,
+        pois: List<com.neil.trantools.data.gems.GemPoi> = GemsRepository.loadPois(context),
+    ): List<CityPackInfo> {
         return listOf(
             CityPackInfo(
                 id = "kyoto",
@@ -75,7 +108,7 @@ object ResourcePackageRepository {
                 description = "Temples, markets, shrines, and curated walking spots",
                 sizeMb = 42,
                 poiCount = pois.size,
-                installed = true
+                installed = "kyoto" in installedCityPackIds
             ),
             CityPackInfo(
                 id = "osaka",
@@ -83,7 +116,7 @@ object ResourcePackageRepository {
                 description = "Food districts and compact city exploration bundle",
                 sizeMb = 36,
                 poiCount = 0,
-                installed = false
+                installed = "osaka" in installedCityPackIds
             )
         )
     }

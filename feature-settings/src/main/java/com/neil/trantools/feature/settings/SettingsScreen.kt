@@ -80,6 +80,10 @@ fun SettingsScreen(
     onOpenLanguagePacks: () -> Unit = {},
     onOpenModelPacks: () -> Unit = {},
     onOpenStorageManager: () -> Unit = {},
+    onInstallModelPack: (String) -> Unit = {},
+    onRemoveModelPack: (String) -> Unit = {},
+    onDownloadCityPack: (String) -> Unit = {},
+    onDeleteCityPack: (String) -> Unit = {},
     onClearCache: () -> Unit = {},
     onOpenPrivacy: () -> Unit = {},
     onOpenSupport: () -> Unit = {},
@@ -195,12 +199,24 @@ fun SettingsScreen(
         }
         if (modelPacks.isNotEmpty()) {
             item {
-                InfoListCard(
-                    title = stringResource(R.string.settings_model_packs),
-                    rows = modelPacks.map {
-                        "${it.title} · ${if (it.installed) stringResource(R.string.settings_pack_installed) else stringResource(R.string.settings_pack_not_installed)} · ${stringResource(R.string.settings_pack_size, it.sizeMb)}"
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainerLow)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        modelPacks.forEach { pack ->
+                            ModelPackRow(
+                                pack = pack,
+                                onInstall = { onInstallModelPack(pack.id) },
+                                onRemove = { onRemoveModelPack(pack.id) }
+                            )
+                        }
                     }
-                )
+                }
             }
         }
         item {
@@ -213,12 +229,24 @@ fun SettingsScreen(
         }
         if (cityPacks.isNotEmpty()) {
             item {
-                InfoListCard(
-                    title = stringResource(R.string.settings_city_packs),
-                    rows = cityPacks.map {
-                        "${it.title} · ${if (it.installed) stringResource(R.string.settings_pack_installed) else stringResource(R.string.settings_pack_not_installed)} · ${stringResource(R.string.settings_pack_size, it.sizeMb)}"
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainerLow)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        cityPacks.forEach { pack ->
+                            CityPackRow(
+                                pack = pack,
+                                onDownload = { onDownloadCityPack(pack.id) },
+                                onDelete = { onDeleteCityPack(pack.id) }
+                            )
+                        }
                     }
-                )
+                }
             }
         }
         item {
@@ -300,6 +328,96 @@ fun SettingsScreen(
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun ModelPackRow(
+    pack: ModelPackInfo,
+    onInstall: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(pack.title, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = "${pack.description} · ${stringResource(R.string.settings_pack_size, pack.sizeMb)}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+            if (pack.premium) {
+                Text(
+                    text = stringResource(R.string.settings_pack_pro_only),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        if (pack.id == "translate-core") {
+            Text(
+                text = if (pack.installed) {
+                    stringResource(R.string.settings_pack_installed)
+                } else {
+                    stringResource(R.string.settings_pack_not_installed)
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else if (pack.installed) {
+            OutlinedButton(onClick = onRemove) {
+                Text(stringResource(R.string.action_remove))
+            }
+        } else {
+            Button(onClick = onInstall) {
+                Text(stringResource(R.string.action_download))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CityPackRow(
+    pack: CityPackInfo,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(pack.title, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = "${pack.description} · ${stringResource(R.string.settings_pack_size, pack.sizeMb)}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = stringResource(R.string.settings_pack_poi_count, pack.poiCount),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        if (pack.installed) {
+            OutlinedButton(onClick = onDelete) {
+                Text(stringResource(R.string.action_remove))
+            }
+        } else {
+            Button(onClick = onDownload) {
+                Text(stringResource(R.string.action_download))
+            }
+        }
     }
 }
 

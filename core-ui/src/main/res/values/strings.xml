@@ -263,6 +263,8 @@
     <string name="settings_pack_installed">已安装</string>
     <string name="settings_pack_not_installed">未安装</string>
     <string name="settings_pack_size">大小 %1$d MB</string>
+    <string name="settings_pack_pro_only">Pro 权益</string>
+    <string name="settings_pack_poi_count">包含 %1$d 个 POI</string>
     <string name="settings_pro_active">Voyager Pro 已开通</string>
     <string name="settings_upgrade_pro">升级到 Voyager Pro</string>
     <string name="settings_pro_desc_active">你已解锁高质量 OCR 和更大的本地模型包。</string>
