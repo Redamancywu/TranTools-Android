@@ -6,21 +6,28 @@ import androidx.room.withTransaction
 import com.neil.trantools.data.history.AppDatabase
 
 object LocalContentStore {
+    private const val INDEX_META_PREFS = "local_content_index_meta"
+    private const val KEY_WIKI_INDEX_VERSION_PREFIX = "wiki_index_version_"
+    private const val KEY_POI_INDEX_VERSION_PREFIX = "poi_index_version_"
+
     @Volatile
     private var initialized = false
     private lateinit var db: AppDatabase
+    private lateinit var appContext: Context
 
     fun init(context: Context) {
         if (initialized) return
         synchronized(this) {
             if (initialized) return
+            appContext = context.applicationContext
             db = Room.databaseBuilder(
-                context.applicationContext,
+                appContext,
                 AppDatabase::class.java,
                 "tran_tools.db"
             ).addMigrations(
                 AppDatabase.MIGRATION_1_2,
-                AppDatabase.MIGRATION_2_3
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4
             ).build()
             initialized = true
         }
@@ -82,5 +89,29 @@ object LocalContentStore {
     suspend fun searchPoiIds(language: String, query: String, limit: Int): List<String> {
         if (!initialized) return emptyList()
         return db.localContentDao().searchPoiIds(language, query, limit)
+    }
+
+    fun getWikiIndexVersion(language: String): Int {
+        if (!initialized) return 0
+        val prefs = appContext.getSharedPreferences(INDEX_META_PREFS, Context.MODE_PRIVATE)
+        return prefs.getInt("$KEY_WIKI_INDEX_VERSION_PREFIX$language", 0)
+    }
+
+    fun setWikiIndexVersion(language: String, version: Int) {
+        if (!initialized) return
+        val prefs = appContext.getSharedPreferences(INDEX_META_PREFS, Context.MODE_PRIVATE)
+        prefs.edit().putInt("$KEY_WIKI_INDEX_VERSION_PREFIX$language", version).apply()
+    }
+
+    fun getPoiIndexVersion(language: String): Int {
+        if (!initialized) return 0
+        val prefs = appContext.getSharedPreferences(INDEX_META_PREFS, Context.MODE_PRIVATE)
+        return prefs.getInt("$KEY_POI_INDEX_VERSION_PREFIX$language", 0)
+    }
+
+    fun setPoiIndexVersion(language: String, version: Int) {
+        if (!initialized) return
+        val prefs = appContext.getSharedPreferences(INDEX_META_PREFS, Context.MODE_PRIVATE)
+        prefs.edit().putInt("$KEY_POI_INDEX_VERSION_PREFIX$language", version).apply()
     }
 }

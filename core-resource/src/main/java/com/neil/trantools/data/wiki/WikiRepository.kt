@@ -11,6 +11,7 @@ import org.json.JSONArray
 import java.util.Locale
 
 object WikiRepository {
+    private const val WIKI_INDEX_VERSION = 2
     private val cache = mutableMapOf<String, List<WikiArticle>>()
 
     fun loadArticles(context: Context): List<WikiArticle> {
@@ -72,7 +73,9 @@ object WikiRepository {
 
     suspend fun syncIndexIfNeeded(context: Context) {
         val language = currentLanguage(context)
-        if (LocalContentStore.wikiCount(language) > 0) return
+        val hasIndexedData = LocalContentStore.wikiCount(language) > 0
+        val currentVersion = LocalContentStore.getWikiIndexVersion(language)
+        if (hasIndexedData && currentVersion >= WIKI_INDEX_VERSION) return
         val articles = withContext(Dispatchers.IO) {
             val assetName = if (language.startsWith("zh")) {
                 "wiki_articles_zh.json"
@@ -90,6 +93,7 @@ object WikiRepository {
                 article.toFtsEntity(language = language, rowId = index + 1)
             }
         )
+        LocalContentStore.setWikiIndexVersion(language, WIKI_INDEX_VERSION)
         cache[language] = articles
     }
 

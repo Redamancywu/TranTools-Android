@@ -5,9 +5,11 @@ import androidx.room.Entity
 import androidx.room.Fts4
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "wiki_article")
+@Entity(
+    tableName = "wiki_article",
+    primaryKeys = ["id", "language"]
+)
 data class WikiArticleEntity(
-    @PrimaryKey
     val id: String,
     val language: String,
     val title: String,
@@ -35,9 +37,11 @@ data class WikiArticleFtsEntity(
     val tags: String,
 )
 
-@Entity(tableName = "poi")
+@Entity(
+    tableName = "poi",
+    primaryKeys = ["id", "language"]
+)
 data class PoiEntity(
-    @PrimaryKey
     val id: String,
     val language: String,
     val title: String,

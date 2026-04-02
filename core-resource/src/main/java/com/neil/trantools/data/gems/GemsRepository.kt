@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
 object GemsRepository {
+    private const val POI_INDEX_VERSION = 2
     private val cache = mutableMapOf<String, List<GemPoi>>()
 
     fun loadPois(context: Context): List<GemPoi> {
@@ -77,7 +78,9 @@ object GemsRepository {
 
     suspend fun syncIndexIfNeeded(context: Context) {
         val language = context.resources.configuration.locales[0]?.language ?: "en"
-        if (LocalContentStore.poiCount(language) > 0) return
+        val hasIndexedData = LocalContentStore.poiCount(language) > 0
+        val currentVersion = LocalContentStore.getPoiIndexVersion(language)
+        if (hasIndexedData && currentVersion >= POI_INDEX_VERSION) return
         val pois = withContext(Dispatchers.IO) {
             val assetName = if (language.startsWith("zh")) {
                 "gems_pois_zh.json"
@@ -95,6 +98,7 @@ object GemsRepository {
                 poi.toFtsEntity(language = language, rowId = index + 1)
             }
         )
+        LocalContentStore.setPoiIndexVersion(language, POI_INDEX_VERSION)
         cache[language] = pois
     }
 

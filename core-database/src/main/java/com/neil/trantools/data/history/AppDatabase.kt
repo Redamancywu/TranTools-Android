@@ -23,7 +23,7 @@ import com.neil.trantools.data.content.WikiArticleFtsEntity
         PoiEntity::class,
         PoiFtsEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(HistoryTypeConverters::class)
@@ -104,6 +104,67 @@ abstract class AppDatabase : RoomDatabase() {
                     `address` TEXT NOT NULL, `tags` TEXT NOT NULL)
                     """.trimIndent()
                 )
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `wiki_article_new` (
+                        `id` TEXT NOT NULL,
+                        `language` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `place` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `summary` TEXT NOT NULL,
+                        `fact` TEXT NOT NULL,
+                        `contentBlob` TEXT NOT NULL,
+                        `tagsBlob` TEXT NOT NULL,
+                        PRIMARY KEY(`id`, `language`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `wiki_article_new` (`id`, `language`, `title`, `place`, `category`, `summary`, `fact`, `contentBlob`, `tagsBlob`)
+                    SELECT `id`, `language`, `title`, `place`, `category`, `summary`, `fact`, `contentBlob`, `tagsBlob`
+                    FROM `wiki_article`
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE `wiki_article`")
+                db.execSQL("ALTER TABLE `wiki_article_new` RENAME TO `wiki_article`")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `poi_new` (
+                        `id` TEXT NOT NULL,
+                        `language` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `summary` TEXT NOT NULL,
+                        `tip` TEXT NOT NULL,
+                        `address` TEXT NOT NULL,
+                        `latitude` REAL NOT NULL,
+                        `longitude` REAL NOT NULL,
+                        `rating` REAL NOT NULL,
+                        `tagsBlob` TEXT NOT NULL,
+                        `bestTime` TEXT NOT NULL,
+                        `recommendedDuration` TEXT NOT NULL,
+                        `budgetLevel` TEXT NOT NULL,
+                        PRIMARY KEY(`id`, `language`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `poi_new` (`id`, `language`, `title`, `category`, `summary`, `tip`, `address`, `latitude`, `longitude`, `rating`, `tagsBlob`, `bestTime`, `recommendedDuration`, `budgetLevel`)
+                    SELECT `id`, `language`, `title`, `category`, `summary`, `tip`, `address`, `latitude`, `longitude`, `rating`, `tagsBlob`, `bestTime`, `recommendedDuration`, `budgetLevel`
+                    FROM `poi`
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE `poi`")
+                db.execSQL("ALTER TABLE `poi_new` RENAME TO `poi`")
             }
         }
     }
