@@ -127,6 +127,14 @@ fun ChatScreen(
                 )
             }
         }
+        uiState.modelRuntimeHint?.takeIf { it.isNotBlank() }?.let { hint ->
+            Text(
+                text = hint,
+                modifier = Modifier.padding(horizontal = 20.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
 
         LazyColumn(
             modifier = Modifier

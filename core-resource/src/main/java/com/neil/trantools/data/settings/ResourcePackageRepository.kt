@@ -1,5 +1,6 @@
 package com.neil.trantools.data.settings
 
+import android.app.ActivityManager
 import android.content.Context
 import com.neil.trantools.data.gems.GemsRepository
 import com.neil.trantools.data.translation.TranslationModelStore
@@ -47,6 +48,7 @@ private data class DownloadableModelPackDefinition(
     val fileName: String,
     val downloadUrl: String,
     val runtimeLabel: String,
+    val sha256: String? = null,
 )
 
 object ResourcePackageRepository {
@@ -119,6 +121,14 @@ object ResourcePackageRepository {
             return
         }
         if (packId == assistantQwenPack.id) {
+            if (!canRunAssistantModel(context)) {
+                ModelPackStore.setFailed(
+                    context = context,
+                    packId = packId,
+                    errorMessage = assistantModelRamRequirementError
+                )
+                return
+            }
             enqueuePrimaryAssistantPackDownload(context)
             return
         }
@@ -220,7 +230,8 @@ object ResourcePackageRepository {
             context = context,
             packId = assistantQwenPack.id,
             fileName = assistantQwenPack.fileName,
-            downloadUrl = assistantQwenPack.downloadUrl
+            downloadUrl = assistantQwenPack.downloadUrl,
+            expectedSha256 = assistantQwenPack.sha256
         )
     }
 
@@ -240,6 +251,13 @@ object ResourcePackageRepository {
         return packId in premiumModelPackIds
     }
 
+    private fun canRunAssistantModel(context: Context): Boolean {
+        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return true
+        val info = ActivityManager.MemoryInfo()
+        manager.getMemoryInfo(info)
+        return info.totalMem >= minAssistantModelRamBytes
+    }
+
     private val assistantQwenPack = DownloadableModelPackDefinition(
         id = "qwen2.5-1.5b-instruct-q8",
         title = "Qwen2.5 1.5B Instruct",
@@ -248,7 +266,8 @@ object ResourcePackageRepository {
         premium = true,
         fileName = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.task",
         downloadUrl = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.task",
-        runtimeLabel = "MediaPipe LLM"
+        runtimeLabel = "MediaPipe LLM",
+        sha256 = null
     )
 
     private val premiumModelPackIds = setOf(
@@ -257,4 +276,6 @@ object ResourcePackageRepository {
     )
 
     private const val premiumRequiredError = "TranTools Pro subscription required."
+    private const val assistantModelRamRequirementError = "Device memory is below the minimum requirement for this model."
+    private const val minAssistantModelRamBytes = 4L * 1024L * 1024L * 1024L
 }

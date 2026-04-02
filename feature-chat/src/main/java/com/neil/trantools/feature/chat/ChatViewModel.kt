@@ -11,6 +11,7 @@ import com.neil.trantools.data.chat.ChatStore
 import com.neil.trantools.data.gems.GemsRepository
 import com.neil.trantools.data.history.HistoryStore
 import com.neil.trantools.data.wiki.WikiRepository
+import com.neil.trantools.domain.chat.AssistantModelRuntimeState
 import com.neil.trantools.domain.chat.BuildLocalAssistantResponseUseCase
 import com.neil.trantools.domain.chat.MediaPipeAssistantChatEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -63,6 +64,7 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.IO) {
             mediaPipeAssistantChatEngine.warmUp()
+            refreshModelRuntimeHint()
         }
     }
 
@@ -172,6 +174,7 @@ class ChatViewModel @Inject constructor(
                     sources = answer.sources,
                     suggestedQuestions = answer.suggestedQuestions
                 )
+                refreshModelRuntimeHint()
                 _uiState.update { state ->
                     state.copy(
                         isThinking = false,
@@ -184,6 +187,7 @@ class ChatViewModel @Inject constructor(
                 appendAssistantMessage(
                     text = if (partial.isNotBlank()) partial else appContext.getString(R.string.chat_timeout)
                 )
+                refreshModelRuntimeHint()
                 _uiState.update { state ->
                     state.copy(
                         isThinking = false,
@@ -225,6 +229,22 @@ class ChatViewModel @Inject constructor(
             state.copy(messages = state.messages + assistantMessage)
         }
         persistMessage(assistantMessage)
+    }
+
+    private fun refreshModelRuntimeHint() {
+        val status = mediaPipeAssistantChatEngine.getRuntimeStatus()
+        val hint = when (status.state) {
+            AssistantModelRuntimeState.Unknown -> null
+            AssistantModelRuntimeState.Ready -> appContext.getString(R.string.chat_model_runtime_ready)
+            AssistantModelRuntimeState.NoModel -> appContext.getString(R.string.chat_model_runtime_missing)
+            AssistantModelRuntimeState.Failed -> {
+                val reason = status.message?.trim().orEmpty().ifBlank {
+                    appContext.getString(R.string.chat_model_runtime_failed_generic)
+                }
+                appContext.getString(R.string.chat_model_runtime_failed_with_reason, reason)
+            }
+        }
+        _uiState.update { state -> state.copy(modelRuntimeHint = hint) }
     }
 
     private fun persistMessage(message: ChatMessage) {

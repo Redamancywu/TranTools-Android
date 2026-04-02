@@ -10,12 +10,14 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import java.io.BufferedInputStream
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.net.URL
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 
@@ -27,6 +29,10 @@ class ModelPackDownloadWorker(
         val packId = inputData.getString(KEY_PACK_ID) ?: return Result.failure()
         val fileName = inputData.getString(KEY_FILE_NAME) ?: return Result.failure()
         val downloadUrl = inputData.getString(KEY_DOWNLOAD_URL) ?: return Result.failure()
+        val expectedSha256 = inputData.getString(KEY_EXPECTED_SHA256)
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
 
         val destinationDir = File(applicationContext.filesDir, "model-packs")
         if (!destinationDir.exists()) destinationDir.mkdirs()
@@ -35,7 +41,11 @@ class ModelPackDownloadWorker(
 
         return runCatching {
             ModelPackStore.setDownloading(applicationContext, packId, 1)
-            downloadFile(downloadUrl, tempFile) { progress ->
+            downloadFile(
+                downloadUrl = downloadUrl,
+                destination = tempFile,
+                expectedSha256 = expectedSha256
+            ) { progress ->
                 ModelPackStore.setDownloading(applicationContext, packId, progress)
                 setProgress(
                     Data.Builder()
@@ -59,12 +69,12 @@ class ModelPackDownloadWorker(
             Result.success()
         }.getOrElse { throwable ->
             if (throwable is CancellationException) throw throwable
-            tempFile.delete()
             val failure = classifyFailure(throwable)
             if (failure.retryable && runAttemptCount < MAX_RETRY_ATTEMPTS) {
                 ModelPackStore.setDownloading(applicationContext, packId, 1)
                 Result.retry()
             } else {
+                tempFile.delete()
                 ModelPackStore.setFailed(
                     context = applicationContext,
                     packId = packId,
@@ -78,19 +88,29 @@ class ModelPackDownloadWorker(
     private suspend fun downloadFile(
         downloadUrl: String,
         destination: File,
+        expectedSha256: String?,
         onProgress: suspend (Int) -> Unit,
     ) {
+        val existingBytes = destination.takeIf { it.exists() }?.length()?.coerceAtLeast(0L) ?: 0L
         val connection = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 60_000
             requestMethod = "GET"
             instanceFollowRedirects = true
             setRequestProperty("User-Agent", "TranTools-Android/1.0")
+            if (existingBytes > 0L) {
+                setRequestProperty("Range", "bytes=$existingBytes-")
+            }
         }
         try {
             connection.connect()
 
             val responseCode = connection.responseCode
+            if (responseCode == 416 && existingBytes > 0L) {
+                verifyChecksumIfNeeded(destination, expectedSha256)
+                onProgress(100)
+                return
+            }
             if (responseCode !in 200..299) {
                 throw DownloadFailure(
                     message = when (responseCode) {
@@ -101,24 +121,47 @@ class ModelPackDownloadWorker(
                     retryable = isRetryableHttpCode(responseCode)
                 )
             }
+            val resolvedSha256 = expectedSha256 ?: parseSha256FromEtag(connection.getHeaderField("ETag"))
 
-            val totalBytes = connection.contentLengthLong.coerceAtLeast(0L)
-            destination.outputStream().use { output ->
-                connection.inputStream.use { input ->
+            val appendMode = responseCode == 206 && existingBytes > 0L
+            if (!appendMode && existingBytes > 0L) {
+                destination.delete()
+            }
+            var downloadedBytes = if (appendMode) existingBytes else 0L
+            val contentLength = connection.contentLengthLong.coerceAtLeast(0L)
+            val totalBytes = when {
+                contentLength <= 0L -> 0L
+                appendMode -> existingBytes + contentLength
+                else -> contentLength
+            }
+
+            if (totalBytes > 0L && downloadedBytes > 0L) {
+                val initialProgress = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(1, 99)
+                onProgress(initialProgress)
+            }
+
+            destination.outputStream().buffered().use { output ->
+                connection.inputStream.buffered().use { input ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var downloaded = 0L
                     var read = input.read(buffer)
                     while (read >= 0) {
                         output.write(buffer, 0, read)
-                        downloaded += read
+                        downloadedBytes += read
                         if (totalBytes > 0L) {
-                            val progress = ((downloaded * 100L) / totalBytes).toInt().coerceIn(1, 99)
+                            val progress = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(1, 99)
                             onProgress(progress)
                         }
                         read = input.read(buffer)
                     }
                 }
             }
+            if (totalBytes > 0L && downloadedBytes < totalBytes) {
+                throw DownloadFailure(
+                    message = "Download interrupted before completion.",
+                    retryable = true
+                )
+            }
+            verifyChecksumIfNeeded(destination, resolvedSha256)
             onProgress(100)
         } catch (timeout: SocketTimeoutException) {
             throw DownloadFailure(
@@ -143,10 +186,51 @@ class ModelPackDownloadWorker(
         }
     }
 
+    private fun verifyChecksumIfNeeded(
+        file: File,
+        expectedSha256: String?,
+    ) {
+        if (expectedSha256.isNullOrBlank()) return
+        val actual = computeSha256(file)
+        if (actual != expectedSha256) {
+            file.delete()
+            throw DownloadFailure(
+                message = "Downloaded file integrity check failed.",
+                retryable = true
+            )
+        }
+    }
+
+    private fun parseSha256FromEtag(etag: String?): String? {
+        val normalized = etag
+            ?.trim()
+            ?.removePrefix("\"")
+            ?.removeSuffix("\"")
+            ?.lowercase()
+            ?: return null
+        return normalized.takeIf { value ->
+            value.length == 64 && value.all { ch -> ch in '0'..'9' || ch in 'a'..'f' }
+        }
+    }
+
+    private fun computeSha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        BufferedInputStream(file.inputStream()).use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            var read = input.read(buffer)
+            while (read >= 0) {
+                digest.update(buffer, 0, read)
+                read = input.read(buffer)
+            }
+        }
+        return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+    }
+
     companion object {
         private const val KEY_PACK_ID = "pack_id"
         private const val KEY_FILE_NAME = "file_name"
         private const val KEY_DOWNLOAD_URL = "download_url"
+        private const val KEY_EXPECTED_SHA256 = "expected_sha256"
         private const val KEY_PROGRESS = "progress"
         private const val MAX_RETRY_ATTEMPTS = 2
         private const val RETRY_BACKOFF_SECONDS = 30L
@@ -156,6 +240,7 @@ class ModelPackDownloadWorker(
             packId: String,
             fileName: String,
             downloadUrl: String,
+            expectedSha256: String? = null,
         ) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -172,6 +257,7 @@ class ModelPackDownloadWorker(
                         .putString(KEY_PACK_ID, packId)
                         .putString(KEY_FILE_NAME, fileName)
                         .putString(KEY_DOWNLOAD_URL, downloadUrl)
+                        .putString(KEY_EXPECTED_SHA256, expectedSha256)
                         .build()
                 )
                 .build()

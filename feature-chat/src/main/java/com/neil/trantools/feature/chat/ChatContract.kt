@@ -20,4 +20,5 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val isThinking: Boolean = false,
     val streamingAnswer: String = "",
+    val modelRuntimeHint: String? = null,
 )

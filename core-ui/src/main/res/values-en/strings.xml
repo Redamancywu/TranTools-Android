@@ -219,6 +219,10 @@
     <string name="chat_suggested_questions">Suggested Follow-ups</string>
     <string name="chat_no_match">There is not enough matching local data yet. Try a more specific place, food, building, or wording.</string>
     <string name="chat_timeout">Answer generation timed out. Returning the best available result so far.</string>
+    <string name="chat_model_runtime_ready">Local model is ready. On-device inference is enabled.</string>
+    <string name="chat_model_runtime_missing">No local model pack detected. Using retrieval-only fallback.</string>
+    <string name="chat_model_runtime_failed_generic">On-device model is currently unavailable.</string>
+    <string name="chat_model_runtime_failed_with_reason">On-device model unavailable: %1$s</string>
     <string name="chat_history_translate">Translate history</string>
     <string name="chat_history_photo">Photo translate history</string>
     <string name="chat_history_voice">Voice translate history</string>
