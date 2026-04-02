@@ -79,6 +79,10 @@ fun WikiRoute(
         onQueryChange = viewModel::setQuery,
         onQuestionChange = viewModel::setQuestion,
         onAskQuestion = viewModel::askQuestion,
+        onUseSuggestedQuestion = { question ->
+            viewModel.setQuestion(question)
+            viewModel.askQuestion()
+        },
         onOpenChat = onOpenChat,
         onCategorySelect = viewModel::setCategory,
         onToggleFavorite = viewModel::toggleFavorite,
@@ -122,6 +126,7 @@ fun WikiScreen(
     onQueryChange: (String) -> Unit = {},
     onQuestionChange: (String) -> Unit = {},
     onAskQuestion: () -> Unit = {},
+    onUseSuggestedQuestion: (String) -> Unit = {},
     onOpenChat: (String) -> Unit = {},
     onCategorySelect: (WikiCategory?) -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
@@ -252,8 +257,10 @@ fun WikiScreen(
                 sourceArticles = uiState.answer?.sourceIds.orEmpty().mapNotNull { id ->
                     WikiRepository.findById(uiState.allArticles, id)
                 },
+                suggestedQuestions = uiState.answer?.suggestedQuestions.orEmpty(),
                 onQuestionChange = onQuestionChange,
                 onAskQuestion = onAskQuestion,
+                onUseSuggestedQuestion = onUseSuggestedQuestion,
                 onOpenChat = onOpenChat,
                 onOpenArticle = onOpenArticle,
                 modifier = Modifier.padding(horizontal = 20.dp)
@@ -518,8 +525,10 @@ private fun LocalAnswerCard(
     question: String,
     answer: String?,
     sourceArticles: List<WikiArticle>,
+    suggestedQuestions: List<String>,
     onQuestionChange: (String) -> Unit,
     onAskQuestion: () -> Unit,
+    onUseSuggestedQuestion: (String) -> Unit,
     onOpenChat: (String) -> Unit,
     onOpenArticle: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -600,6 +609,25 @@ private fun LocalAnswerCard(
                             Icon(Icons.Outlined.AutoStories, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(8.dp))
                             Text(article.title, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+                if (suggestedQuestions.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.wiki_qa_suggestions),
+                        fontWeight = FontWeight.Bold
+                    )
+                    suggestedQuestions.forEach { suggested ->
+                        Card(
+                            onClick = { onUseSuggestedQuestion(suggested) },
+                            shape = RoundedCornerShape(999.dp),
+                            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.secondaryContainer)
+                        ) {
+                            Text(
+                                text = suggested,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
                         }
                     }
                 }

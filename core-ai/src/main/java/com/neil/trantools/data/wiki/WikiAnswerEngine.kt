@@ -4,6 +4,7 @@ data class WikiAnswer(
     val question: String,
     val answer: String,
     val sourceIds: List<String>,
+    val suggestedQuestions: List<String> = emptyList(),
 )
 
 object WikiAnswerEngine {
@@ -33,7 +34,8 @@ object WikiAnswerEngine {
             return WikiAnswer(
                 question = normalizedQuestion,
                 answer = fallbackAnswer,
-                sourceIds = emptyList()
+                sourceIds = emptyList(),
+                suggestedQuestions = emptyList()
             )
         }
 
@@ -65,10 +67,18 @@ object WikiAnswerEngine {
             }
         }
 
+        val suggestedQuestions = buildList {
+            topArticles.forEach { article ->
+                add("What should I know before visiting ${article.title}?")
+                add("Any local etiquette or tips for ${article.title}?")
+            }
+        }.distinct().take(3)
+
         return WikiAnswer(
             question = normalizedQuestion,
             answer = answerText,
-            sourceIds = topArticles.map { it.id }
+            sourceIds = topArticles.map { it.id },
+            suggestedQuestions = suggestedQuestions
         )
     }
 

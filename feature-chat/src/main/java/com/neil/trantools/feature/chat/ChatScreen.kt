@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -71,6 +72,7 @@ fun ChatRoute(
         onOpenSettings = onOpenSettings,
         onInputChange = viewModel::setInput,
         onSend = viewModel::sendCurrentInput,
+        onUseSuggestedQuestion = viewModel::sendSuggestedQuestion,
         onOpenWikiArticle = onOpenWikiArticle,
         onOpenGemDetail = onOpenGemDetail
     )
@@ -84,6 +86,7 @@ fun ChatScreen(
     onOpenSettings: () -> Unit = {},
     onInputChange: (String) -> Unit = {},
     onSend: () -> Unit = {},
+    onUseSuggestedQuestion: (String) -> Unit = {},
     onOpenWikiArticle: (String) -> Unit = {},
     onOpenGemDetail: (String) -> Unit = {},
 ) {
@@ -132,6 +135,7 @@ fun ChatScreen(
             items(uiState.messages, key = { it.id }) { message ->
                 ChatBubble(
                     message = message,
+                    onUseSuggestedQuestion = onUseSuggestedQuestion,
                     onOpenWikiArticle = onOpenWikiArticle,
                     onOpenGemDetail = onOpenGemDetail
                 )
@@ -179,6 +183,7 @@ fun ChatScreen(
 @Composable
 private fun ChatBubble(
     message: ChatMessage,
+    onUseSuggestedQuestion: (String) -> Unit,
     onOpenWikiArticle: (String) -> Unit,
     onOpenGemDetail: (String) -> Unit,
 ) {
@@ -213,10 +218,35 @@ private fun ChatBubble(
                         when (source.type) {
                             ChatSourceType.Wiki -> onOpenWikiArticle(source.id)
                             ChatSourceType.Gem -> onOpenGemDetail(source.id)
+                            ChatSourceType.Map -> onOpenGemDetail(source.id)
                             ChatSourceType.History -> Unit
                         }
                     }
                 )
+            }
+        }
+        if (!isUser && message.suggestedQuestions.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.chat_suggested_questions),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge
+            )
+            message.suggestedQuestions.forEach { suggested ->
+                Card(
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .fillMaxWidth(),
+                    onClick = { onUseSuggestedQuestion(suggested) },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Text(
+                        text = suggested,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
             }
         }
     }
@@ -243,6 +273,7 @@ private fun SourceCard(
                 imageVector = when (source.type) {
                     ChatSourceType.Wiki -> Icons.Outlined.AutoStories
                     ChatSourceType.Gem -> Icons.Outlined.Explore
+                    ChatSourceType.Map -> Icons.Outlined.Place
                     ChatSourceType.History -> Icons.AutoMirrored.Outlined.Send
                 },
                 contentDescription = null,

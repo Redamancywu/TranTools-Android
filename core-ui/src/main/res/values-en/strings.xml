@@ -36,6 +36,7 @@
     <string name="wiki_qa_empty">Enter a question and the app will answer from the local wiki package.</string>
     <string name="wiki_qa_no_match">No strong local article match was found. Try naming a place, dish, custom, or landmark more specifically.</string>
     <string name="wiki_qa_sources">Sources</string>
+    <string name="wiki_qa_suggestions">Suggested Next Questions</string>
     <string name="wiki_detected_from_local">Answer generated from the local wiki package</string>
     <string name="wiki_continue_chat">Continue in Assistant Chat</string>
     <string name="topbar_title">Ethereal Explorer</string>
@@ -213,6 +214,7 @@
     <string name="chat_welcome">Ask about landmark context, food tips, recent translation history, or let the app connect local wiki and nearby place data.</string>
     <string name="chat_thinking">Composing a local answer…</string>
     <string name="chat_sources">Sources</string>
+    <string name="chat_suggested_questions">Suggested Follow-ups</string>
     <string name="chat_no_match">There is not enough matching local data yet. Try a more specific place, food, building, or wording.</string>
     <string name="chat_history_translate">Translate history</string>
     <string name="chat_history_photo">Photo translate history</string>

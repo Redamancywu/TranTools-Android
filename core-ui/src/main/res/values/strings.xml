@@ -36,6 +36,7 @@
     <string name="wiki_qa_empty">输入问题后，系统会基于本地百科文章生成离线回答。</string>
     <string name="wiki_qa_no_match">没有找到足够匹配的本地文章。可以尝试补充更具体的地点、菜名、习俗或建筑名称。</string>
     <string name="wiki_qa_sources">参考来源</string>
+    <string name="wiki_qa_suggestions">推荐下一步问题</string>
     <string name="wiki_detected_from_local">内容来自本地百科知识包</string>
     <string name="wiki_continue_chat">继续到助手聊天</string>
 
@@ -214,6 +215,7 @@
     <string name="chat_welcome">你可以询问景点背景、美食建议、最近翻译上下文，或让系统串联本地百科与附近地点信息。</string>
     <string name="chat_thinking">正在整理本地答案…</string>
     <string name="chat_sources">回答来源</string>
+    <string name="chat_suggested_questions">建议追问</string>
     <string name="chat_no_match">本地数据里暂时没有足够匹配的信息。可以换一个更具体的地点、菜名、建筑或问题表达方式。</string>
     <string name="chat_history_translate">翻译历史</string>
     <string name="chat_history_photo">拍照翻译历史</string>

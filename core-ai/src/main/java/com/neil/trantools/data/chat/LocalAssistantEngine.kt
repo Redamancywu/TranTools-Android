@@ -8,6 +8,7 @@ import com.neil.trantools.data.wiki.WikiArticle
 enum class ChatSourceType {
     Wiki,
     Gem,
+    Map,
     History,
 }
 
@@ -21,6 +22,7 @@ data class ChatSource(
 data class LocalAssistantAnswer(
     val answer: String,
     val sources: List<ChatSource>,
+    val suggestedQuestions: List<String> = emptyList(),
 )
 
 object LocalAssistantEngine {
@@ -37,7 +39,11 @@ object LocalAssistantEngine {
     ): LocalAssistantAnswer {
         val normalizedQuestion = question.trim()
         if (normalizedQuestion.isEmpty()) {
-            return LocalAssistantAnswer(answer = fallbackAnswer, sources = emptyList())
+            return LocalAssistantAnswer(
+                answer = fallbackAnswer,
+                sources = emptyList(),
+                suggestedQuestions = emptyList()
+            )
         }
 
         val expandedQuestion = buildString {
@@ -72,7 +78,11 @@ object LocalAssistantEngine {
             .take(2)
 
         if (wikiMatches.isEmpty() && gemMatches.isEmpty() && historyMatches.isEmpty()) {
-            return LocalAssistantAnswer(answer = fallbackAnswer, sources = emptyList())
+            return LocalAssistantAnswer(
+                answer = fallbackAnswer,
+                sources = emptyList(),
+                suggestedQuestions = emptyList()
+            )
         }
 
         val paragraphs = buildList {
@@ -117,7 +127,7 @@ object LocalAssistantEngine {
                         id = gem.id,
                         title = gem.title,
                         subtitle = gem.address,
-                        type = ChatSourceType.Gem
+                        type = ChatSourceType.Map
                     )
                 )
             }
@@ -137,9 +147,22 @@ object LocalAssistantEngine {
             }
         }
 
+        val suggestedQuestions = buildList {
+            wikiMatches.forEach { (article, _) ->
+                add("Tell me more about ${article.title}.")
+            }
+            gemMatches.forEach { (gem, _) ->
+                add("What should I not miss around ${gem.title}?")
+            }
+            historyMatches.firstOrNull()?.let { (item, _) ->
+                add("Can you refine this translation: ${item.sourceText}?")
+            }
+        }.distinct().take(3)
+
         return LocalAssistantAnswer(
             answer = answerText,
-            sources = sources
+            sources = sources,
+            suggestedQuestions = suggestedQuestions
         )
     }
 

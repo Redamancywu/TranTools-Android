@@ -12,6 +12,7 @@ data class ChatMessage(
     val role: ChatRole,
     val text: String,
     val sources: List<ChatSource> = emptyList(),
+    val suggestedQuestions: List<String> = emptyList(),
 )
 
 data class ChatUiState(

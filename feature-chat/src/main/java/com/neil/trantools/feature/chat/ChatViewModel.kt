@@ -81,6 +81,10 @@ class ChatViewModel @Inject constructor(
         sendMessage(_uiState.value.input)
     }
 
+    fun sendSuggestedQuestion(question: String) {
+        sendMessage(question)
+    }
+
     private fun sendMessage(raw: String) {
         val question = raw.trim()
         if (question.isEmpty() || _uiState.value.isThinking) return
@@ -110,7 +114,8 @@ class ChatViewModel @Inject constructor(
                 id = messageId.getAndIncrement(),
                 role = ChatRole.Assistant,
                 text = answer.answer,
-                sources = answer.sources
+                sources = answer.sources,
+                suggestedQuestions = answer.suggestedQuestions
             )
 
             _uiState.value = _uiState.value.copy(
@@ -128,7 +133,7 @@ class ChatViewModel @Inject constructor(
                     id = message.id,
                     role = message.role.name,
                     text = message.text,
-                    sourcesJson = serializeSources(message.sources),
+                    sourcesJson = serializeMetadata(message.sources, message.suggestedQuestions),
                     createdAtEpochMs = System.currentTimeMillis()
                 )
             )
@@ -136,14 +141,21 @@ class ChatViewModel @Inject constructor(
     }
 }
 
-private fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
-    id = id,
-    role = runCatching { ChatRole.valueOf(role) }.getOrDefault(ChatRole.Assistant),
-    text = text,
-    sources = deserializeSources(sourcesJson)
-)
+private fun ChatMessageEntity.toChatMessage(): ChatMessage {
+    val metadata = deserializeMetadata(sourcesJson)
+    return ChatMessage(
+        id = id,
+        role = runCatching { ChatRole.valueOf(role) }.getOrDefault(ChatRole.Assistant),
+        text = text,
+        sources = metadata.first,
+        suggestedQuestions = metadata.second
+    )
+}
 
-private fun serializeSources(sources: List<ChatSource>): String {
+private fun serializeMetadata(
+    sources: List<ChatSource>,
+    suggestedQuestions: List<String>,
+): String {
     val array = JSONArray()
     sources.forEach { source ->
         val obj = JSONObject().apply {
@@ -154,24 +166,44 @@ private fun serializeSources(sources: List<ChatSource>): String {
         }
         array.put(obj)
     }
-    return array.toString()
+    return JSONObject()
+        .put("sources", array)
+        .put("suggestedQuestions", JSONArray(suggestedQuestions))
+        .toString()
 }
 
-private fun deserializeSources(json: String): List<ChatSource> {
-    if (json.isBlank() || json == "[]") return emptyList()
+private fun deserializeMetadata(json: String): Pair<List<ChatSource>, List<String>> {
+    if (json.isBlank() || json == "[]") return emptyList<ChatSource>() to emptyList()
     return runCatching {
-        val array = JSONArray(json)
-        (0 until array.length()).mapNotNull { i ->
-            runCatching {
-                val obj = array.getJSONObject(i)
-                ChatSource(
-                    id = obj.getString("id"),
-                    title = obj.getString("title"),
-                    subtitle = obj.getString("subtitle"),
-                    type = runCatching { ChatSourceType.valueOf(obj.getString("type")) }
-                        .getOrDefault(ChatSourceType.Wiki)
-                )
-            }.getOrNull()
+        val trimmed = json.trim()
+        if (trimmed.startsWith("[")) {
+            parseSources(JSONArray(trimmed)) to emptyList()
+        } else {
+            val obj = JSONObject(trimmed)
+            val sources = parseSources(obj.optJSONArray("sources") ?: JSONArray())
+            val suggestedQuestions = buildList {
+                val array = obj.optJSONArray("suggestedQuestions") ?: JSONArray()
+                for (index in 0 until array.length()) {
+                    val question = array.optString(index).trim()
+                    if (question.isNotEmpty()) add(question)
+                }
+            }
+            sources to suggestedQuestions
         }
-    }.getOrDefault(emptyList())
+    }.getOrDefault(emptyList<ChatSource>() to emptyList())
+}
+
+private fun parseSources(array: JSONArray): List<ChatSource> {
+    return (0 until array.length()).mapNotNull { i ->
+        runCatching {
+            val obj = array.getJSONObject(i)
+            ChatSource(
+                id = obj.getString("id"),
+                title = obj.getString("title"),
+                subtitle = obj.getString("subtitle"),
+                type = runCatching { ChatSourceType.valueOf(obj.getString("type")) }
+                    .getOrDefault(ChatSourceType.Wiki)
+            )
+        }.getOrNull()
+    }
 }
