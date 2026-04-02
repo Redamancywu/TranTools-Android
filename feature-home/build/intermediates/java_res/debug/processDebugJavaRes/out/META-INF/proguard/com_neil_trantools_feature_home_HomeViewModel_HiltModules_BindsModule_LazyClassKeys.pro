@@ -1,1 +1,0 @@
--keep,allowobfuscation,allowshrinking class com.neil.trantools.feature.home.HomeViewModel
